@@ -109,6 +109,21 @@ export default function World() {
     if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max }
     setJoyPos({ x: dx, y: dy })
     joyMoveRef.current = { x: dx / max, y: -dy / max }
+    // capture moves outside base for flexible joystick
+    const move = (ev) => handleJoyMove(ev)
+    const end = () => {
+      handleJoyEnd()
+      window.removeEventListener('touchmove', move)
+      window.removeEventListener('touchend', end)
+      window.removeEventListener('touchcancel', end)
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', end)
+    }
+    window.addEventListener('touchmove', move, { passive: false })
+    window.addEventListener('touchend', end)
+    window.addEventListener('touchcancel', end)
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', end)
   }, [])
 
   const handleJoyMove = useCallback((e) => {
@@ -221,10 +236,12 @@ export default function World() {
       worldGroup = new THREE.Group()
       scene.add(worldGroup)
 
-      // helper grid (subtle)
-      const grid = new THREE.GridHelper(400, 40, 0x1e2638, 0x1e2638)
+      // helper grid (subtle) — lighter on low-end
+      const gridSize = lowEnd.current ? 180 : 400
+      const gridDivs = lowEnd.current ? 18 : 40
+      const grid = new THREE.GridHelper(gridSize, gridDivs, 0x1e2638, 0x1e2638)
       grid.position.y = 0.01
-      grid.material.opacity = 0.35
+      grid.material.opacity = lowEnd.current ? 0.22 : 0.35
       grid.material.transparent = true
       worldGroup.add(grid)
 
@@ -688,6 +705,16 @@ export default function World() {
               </div>
             )}
             <canvas ref={canvasRef} className="h-full w-full block" style={{ width: '100%', height: '100%' }} />
+            {/* Compass (gap from AI screenshot - north indicator) */}
+            <div className="pointer-events-none absolute right-3 top-16 z-10 flex flex-col items-center gap-1">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/20 backdrop-blur shadow">
+                <div className="relative h-10 w-10 rounded-full border border-white/10 bg-[#0B0F17]/40 flex items-center justify-center">
+                  <span className="absolute -top-1 text-[10px] font-mono font-bold text-white">N</span>
+                  <span className="text-sm" style={{ transform: 'rotate(0deg)' }}>⬆</span>
+                </div>
+              </div>
+              <span className="rounded-full bg-[#0B0F17]/20 backdrop-blur px-1.5 py-0.5 text-[10px] font-mono text-white/70 border border-white/10">1:10</span>
+            </div>
 
             {/* ── Mobile touch controls (only on touch/coarse devices) ── */}
             {isMobile && (
@@ -701,11 +728,8 @@ export default function World() {
                     onTouchEnd={handleJoyEnd}
                     onTouchCancel={handleJoyEnd}
                     onMouseDown={handleJoyStart}
-                    onMouseMove={handleJoyMove}
-                    onMouseUp={handleJoyEnd}
-                    onMouseLeave={handleJoyEnd}
-                    className="relative flex h-[128px] w-[128px] items-center justify-center rounded-full border border-white/20 bg-white/[0.08] backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', opacity: 0.92 }}
+                    className="relative flex h-[128px] w-[128px] items-center justify-center rounded-full border border-white/20 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)] touch-none"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.20)', opacity: 1 }}
                   >
                     {/* base ring */}
                     <div className="absolute inset-2 rounded-full border border-white/10 bg-white/[0.04]" />
@@ -735,16 +759,16 @@ export default function World() {
                     <button
                       onTouchStart={(e) => { e.preventDefault(); if (engineRef.current?.toggleFpv) engineRef.current.toggleFpv() }}
                       onClick={() => engineRef.current?.toggleFpv?.()}
-                      className="h-10 rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur px-3 text-xs font-mono font-bold text-white shadow active:bg-white/30"
-                      style={{ opacity: 0.88 }}
+                      className="h-10 rounded-xl border border-white/20 bg-white/20 backdrop-blur px-3 text-xs font-mono font-bold text-white shadow active:bg-white/30"
+                      style={{ opacity: 1 }}
                     >
                       {isFpv ? 'Orbit' : 'FPV'}
                     </button>
                     <button
                       onTouchStart={(e) => { e.preventDefault(); engineRef.current?.recenter() }}
                       onClick={() => engineRef.current?.recenter()}
-                      className="h-10 w-10 rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30 flex items-center justify-center"
-                      style={{ opacity: 0.88 }}
+                      className="h-10 w-10 rounded-xl border border-white/20 bg-white/20 backdrop-blur text-white shadow active:bg-white/30 flex items-center justify-center"
+                      style={{ opacity: 1 }}
                       aria-label="Recenter"
                     >
                       ⌖
@@ -761,8 +785,8 @@ export default function World() {
                         onMouseDown={() => { actionRef.current.up = true; engineRef.current?.setAction?.('up', true) }}
                         onMouseUp={() => { actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
                         onMouseLeave={() => { actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
-                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-white font-bold shadow active:bg-emerald-500/40 active:border-emerald-400/40"
-                        style={{ opacity: 0.88 }}
+                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/20 backdrop-blur text-white font-bold shadow active:bg-emerald-500/40 active:border-emerald-400/40"
+                        style={{ opacity: 1 }}
                         aria-label="Up"
                       >
                         ▲
@@ -774,8 +798,8 @@ export default function World() {
                         onMouseDown={() => { actionRef.current.down = true; engineRef.current?.setAction?.('down', true) }}
                         onMouseUp={() => { actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
                         onMouseLeave={() => { actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
-                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-white font-bold shadow active:bg-emerald-500/40"
-                        style={{ opacity: 0.88 }}
+                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/20 backdrop-blur text-white font-bold shadow active:bg-emerald-500/40"
+                        style={{ opacity: 1 }}
                         aria-label="Down"
                       >
                         ▼
@@ -789,8 +813,8 @@ export default function World() {
                         onMouseDown={() => { actionRef.current.sprint = true; engineRef.current?.setAction?.('sprint', true) }}
                         onMouseUp={() => { actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
                         onMouseLeave={() => { actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
-                        className="h-[44px] w-[88px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-xs font-mono font-bold text-white shadow active:bg-amber-500/40"
-                        style={{ opacity: 0.88 }}
+                        className="h-[44px] w-[88px] rounded-xl border border-white/20 bg-white/20 backdrop-blur text-xs font-mono font-bold text-white shadow active:bg-amber-500/40"
+                        style={{ opacity: 1 }}
                       >
                         ⚡ SPRINT
                       </button>
@@ -798,16 +822,16 @@ export default function World() {
                         <button
                           onTouchStart={(e) => { e.preventDefault(); engineRef.current?.zoomIn?.() }}
                           onClick={() => engineRef.current?.zoomIn?.()}
-                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30"
-                          style={{ opacity: 0.88 }}
+                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/20 backdrop-blur text-white shadow active:bg-white/30"
+                          style={{ opacity: 1 }}
                         >
                           ＋
                         </button>
                         <button
                           onTouchStart={(e) => { e.preventDefault(); engineRef.current?.zoomOut?.() }}
                           onClick={() => engineRef.current?.zoomOut?.()}
-                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30"
-                          style={{ opacity: 0.88 }}
+                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/20 backdrop-blur text-white shadow active:bg-white/30"
+                          style={{ opacity: 1 }}
                         >
                           －
                         </button>

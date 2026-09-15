@@ -1,6 +1,7 @@
 /**
  * Overpass fetch with lightweight projection, mirror fallback and sample fallback.
  * Must work with zero env keys (free APIs only).
+ * Optimized for low-end: fast timeout → sample, not hang.
  */
 
 import { bboxFromCenter } from './bbox.js'
@@ -10,7 +11,8 @@ const MIRROR = 'https://overpass.kumi.systems/api/interpreter'
 
 function buildQL(bbox) {
   const b = `${bbox.south},${bbox.west},${bbox.north},${bbox.east}`
-  return `[out:json][timeout:25];(way["building"](${b});way["highway"](${b});relation["building"](${b}););out geom;`
+  // use shorter server timeout (12s) so client can abort at 7s without waiting 25
+  return `[out:json][timeout:12];(way["building"](${b});way["highway"](${b});relation["building"](${b}););out geom;`
 }
 
 function projectElements(json, cap = 4000) {
@@ -42,24 +44,37 @@ function projectElements(json, cap = 4000) {
   }
 }
 
+function withTimeout(signal, ms) {
+  if (!ms) return signal
+  const ctrl = AbortSignal.timeout(ms)
+  if (!signal) return ctrl
+  // combine
+  return AbortSignal.any ? AbortSignal.any([signal, ctrl]) : ctrl
+}
+
+async function fetchWithTimeout(url, opts, timeoutMs) {
+  const sig = withTimeout(opts.signal, timeoutMs)
+  return fetch(url, { ...opts, signal: sig })
+}
+
 export async function fetchViaOverpass(bbox, { signal } = {}) {
   const ql = buildQL(bbox)
   const body = `data=${encodeURIComponent(ql)}`
-  const opts = {
+  const baseOpts = {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
-    signal,
   }
-  // try primary then mirror
+  // primary with 7s timeout
   try {
-    const r = await fetch(PRIMARY, opts)
+    const r = await fetchWithTimeout(PRIMARY, { ...baseOpts, signal }, 7000)
     if (!r.ok) throw new Error(`overpass primary ${r.status}`)
     const j = await r.json()
     return { bbox, source: 'overpass', ...projectElements(j) }
   } catch (e) {
-    // mirror fallback
-    const r2 = await fetch(MIRROR, opts)
+    if (signal?.aborted) throw e
+    // mirror fallback with 6s
+    const r2 = await fetchWithTimeout(MIRROR, { ...baseOpts, signal }, 6000)
     if (!r2.ok) throw new Error(`overpass mirror ${r2.status}: ${e?.message}`)
     const j2 = await r2.json()
     return { bbox, source: 'overpass-mirror', ...projectElements(j2) }
@@ -68,7 +83,7 @@ export async function fetchViaOverpass(bbox, { signal } = {}) {
 
 export async function fetchViaProxy(lat, lon, size, { signal } = {}) {
   const u = `/api/osm/chunk?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&size=${encodeURIComponent(size)}`
-  const r = await fetch(u, { signal })
+  const r = await fetchWithTimeout(u, { signal }, 5000)
   if (!r.ok) throw new Error(`proxy ${r.status}`)
   const j = await r.json()
   return j
@@ -77,27 +92,27 @@ export async function fetchViaProxy(lat, lon, size, { signal } = {}) {
 export async function fetchOSMChunk({ lat, lon, size = 0.01 }, { signal } = {}) {
   const bbox = bboxFromCenter(lat, lon, size)
   // strategy: try direct Overpass first (no server load), fallback to proxy, fallback to sample
+  // Each step has its own timeout so total worst ~12s, not 50s
   try {
     const direct = await fetchViaOverpass(bbox, { signal })
     if (direct.elements && direct.elements.length > 0) return direct
-    // empty but successful -> try proxy (might have cached richer)
+    // empty but successful -> try proxy
     try {
       const prox = await fetchViaProxy(lat, lon, size, { signal })
       if (prox.elements?.length) return prox
     } catch (_) {}
     return direct
   } catch (errDirect) {
+    if (signal?.aborted) throw errDirect
     try {
       const prox = await fetchViaProxy(lat, lon, size, { signal })
       return prox
     } catch (errProxy) {
-      // sample fallback: keep UX working offline / rate-limited
+      // sample fallback: keep UX working offline / rate-limited — load instantly (<30ms)
       // eslint-disable-next-line no-console
       console.warn('[osm] overpass + proxy failed, serving sample', errDirect?.message, errProxy?.message)
       const sample = await import('./sampleOSM.json')
       const s = sample.default || sample
-      // re-center sample to requested bbox to keep world consistent visually
-      // we keep geometry as sample (small neighborhood feel)
       return { ...s, bbox, source: 'sample-fallback', _fallbackError: String(errDirect?.message || errProxy?.message) }
     }
   }

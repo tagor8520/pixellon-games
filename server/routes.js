@@ -530,7 +530,7 @@ export function createRoutes({ env, log }) {
         const east = lon + half;
         const bbox = `${south},${west},${north},${east}`;
         // Minimal query: buildings + highways, geometries inline
-        const ql = `[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});relation["building"](${bbox}););out geom;`;
+        const ql = `[out:json][timeout:12];(way["building"](${bbox});way["highway"](${bbox});relation["building"](${bbox}););out geom;`;
         const body = `data=${encodeURIComponent(ql)}`;
         const tryFetch = async (base) => {
           return fetchUpstream(base, {
@@ -539,6 +539,8 @@ export function createRoutes({ env, log }) {
             body,
             signal: ctx.signal,
             log: ctx.log,
+            timeoutMs: 6000,
+            retries: 1,
           });
         };
         let data;
