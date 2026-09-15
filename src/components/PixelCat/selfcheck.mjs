@@ -29,7 +29,9 @@ function fakeCanvas() {
   return { canvas: { getContext: () => ctx, width: 0, height: 0, style: {} }, rects };
 }
 
-function simulate({ minutes = 10, vw = 1440, vh = 900, scale = 5, dpr = 2, caps, cursor = true }) {
+function simulate({ minutes = 10, vw = 1440, vh = 900, scale = 5, dpr = 2, caps, cursor = true, skipUnchanged = false }) {
+  const maxSkippedDraws = CAT_CONFIG.quality?.maxSkippedDraws ?? 3;
+  let skipped = 0;
   const { canvas, rects } = fakeCanvas();
   const renderer = new CatRenderer(canvas);
   renderer.resize(scale, dpr);
@@ -58,7 +60,11 @@ function simulate({ minutes = 10, vw = 1440, vh = 900, scale = 5, dpr = 2, caps,
     behavior.update(dt);
     anim.update(dt);
     rects.length = 0;
-    renderer.draw(anim.pose);
+    // Mirror PixelCat's budget: repaint unless the pose quantises to the same
+    // art-pixel layout, and force one after N consecutive skips.
+    const force = !skipUnchanged || skipped >= maxSkippedDraws;
+    const drew = renderer.draw(anim.pose, { force });
+    skipped = drew ? 0 : skipped + 1;
     stats.frames++;
 
     /* no NaN anywhere */
@@ -108,6 +114,7 @@ function simulate({ minutes = 10, vw = 1440, vh = 900, scale = 5, dpr = 2, caps,
     stats.states.set(behavior.state, (stats.states.get(behavior.state) || 0) + 1);
     if (anim.clip) stats.gestures.set(anim.clip.name, (stats.gestures.get(anim.clip.name) || 0) + 1);
   }
+  stats.renderer = renderer;
   return stats;
 }
 
@@ -195,6 +202,25 @@ for (const gesture of GESTURES) {
   assert.equal(typeof gesture.update, 'function', `${gesture.name} has no update()`);
   assert.ok(gesture.weight > 0, `${gesture.name} can never be picked`);
 }
+
+/* ── 6. device budget: an idle cat must not repaint every frame ── */
+const budget = simulate({
+  minutes: 3,
+  caps: { motion: true, cursor: false, rare: false },
+  skipUnchanged: true,
+});
+const drawRatio = budget.renderer.stats.draws / (budget.renderer.stats.draws + budget.renderer.stats.skips);
+assert.ok(
+  drawRatio < 0.8,
+  `idle cat still repaints ${(drawRatio * 100).toFixed(0)}% of frames — skip logic is not working`,
+);
+assert.ok(
+  budget.renderer.stats.skips > 0 && budget.renderer.stats.draws > 0,
+  'skip logic either never skipped or never drew',
+);
+console.log(
+  `  draw efficiency: ${(drawRatio * 100).toFixed(1)}% of frames painted (${budget.renderer.stats.draws} draws, ${budget.renderer.stats.skips} skipped)`,
+);
 
 console.log('PixelCat self-check passed');
 console.log(

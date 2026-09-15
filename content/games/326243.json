@@ -1,0 +1,25 @@
+{
+  "id": "326243",
+  "slug": "elden-ring",
+  "title": "Elden Ring",
+  "genre": "Action RPG",
+  "platforms": ["PC", "PS5", "Xbox"],
+  "tags": ["soulslike", "open world", "co-op", "fromsoftware"],
+  "aliases": ["ER", "Elden Ring Nightreign"],
+  "updated": "2026-09-01",
+  "banner": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1245620/header.jpg",
+  "pages": {
+    "home": {
+      "title": "Overview",
+      "content": "# Elden Ring\n\nAn open-world action RPG from FromSoftware. This page is **authored content** stored in `content/games/326243.json` — it is served to the browser as its own JSON chunk, so it costs nothing on any other route.\n\n## Why author pages at all?\n\n1. Content we own survives an upstream outage, a rate limit or an API deprecation.\n2. A page can be richer than an upstream description dump (tables, builds, routes).\n3. It is cacheable at the edge like any other immutable asset.\n\n## Anatomy\n\n| Layer | Where | Cost to the browser |\n| --- | --- | --- |\n| Manifest row | `content/index.json` | ~120 bytes |\n| Search shard | `content/index-shards/e.json` | ~1 KB |\n| This page | `content/games/326243.json` | only when opened |"
+    },
+    "bosses": {
+      "title": "Boss Checklist",
+      "content": "## Remembrance Bosses\n\n| Boss | Region | Reward |\n| --- | --- | --- |\n| Margit, the Fell Omen | Limgrave | Talisman Pouch |\n| Godrick the Grafted | Stormveil | Great Rune |\n| Rennala, Queen of the Full Moon | Liurnia | Great Rune |\n| Radahn, Starscourge | Caelid | Great Rune |\n\n> Progress resets are not exhaustive — this table is a starting point, not a completionist tracker."
+    },
+    "builds": {
+      "title": "Starter Builds",
+      "content": "## Three builds that work before you respec\n\n### 1. Vagabond Quality\n- **Stats:** 30 Vigor / 20 Endurance / 30 Str / 30 Dex\n- **Weapons:** Claymore, Lordsworn's Greatsword\n\n### 2. Astrologer Glass Cannon\n- **Stats:** 25 Vigor / 60 Int\n- **Weapons:** Meteorite Staff → Carian Regal Scepter\n\n### 3. Faith Caster\n- **Stats:** 30 Vigor / 50 Faith\n- **Weapons:** Erdtree Seal, Blasphemous Blade"
+    }
+  }
+}

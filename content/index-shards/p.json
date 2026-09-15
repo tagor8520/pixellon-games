@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "key": "p",
+  "games": {
+    "839629": {
+      "title": "Persona 3 Reload",
+      "slug": "persona-3-reload",
+      "genre": "Turn-Based RPG",
+      "platforms": [
+        "PC",
+        "PS5",
+        "Xbox"
+      ],
+      "tags": [
+        "jrpg",
+        "atlus",
+        "turn-based",
+        "social sim"
+      ],
+      "aliases": [
+        "P3R"
+      ],
+      "updated": "2026-08-20",
+      "pages": [
+        "home",
+        "social-links"
+      ],
+      "hasLocalContent": true
+    }
+  }
+}

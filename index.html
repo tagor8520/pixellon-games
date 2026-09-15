@@ -5,9 +5,35 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Pixellon — The definitive hub for gaming news, reviews, streams, esports, indie spotlights, and game codex." />
+    <meta name="theme-color" content="#0B0F17" />
+    <meta name="color-scheme" content="dark" />
+
+    <!--
+      Fonts. Three deliberate cost decisions:
+        • fewer weights  — 12 files down to 8; nothing in the UI needs Inter 300
+        • display=swap   — text paints immediately in the fallback, no invisible text
+        • non-blocking   — the stylesheet is fetched async (media swap trick with a
+                           <noscript> fallback), so first paint never waits on Google
+      Self-hosting these as subset woff2 is the next step; see docs/SCALE-PLAN.md.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://shared.akamai.steamstatic.com" />
+    <link rel="dns-prefetch" href="https://media.rawg.io" />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;600;700;800&display=swap"
+      />
+    </noscript>
+
     <title>Pixellon — Play. Share. Belong.</title>
   </head>
   <body class="bg-[#0B0F17] text-[#F8FAFC] antialiased">
@@ -15,4 +41,3 @@
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-

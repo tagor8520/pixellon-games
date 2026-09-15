@@ -100,6 +100,39 @@
   background-size: 32px 32px;
 }
 
+/* ── Cheap virtualisation for long lists ───────────────────────────
+   `content-visibility: auto` lets the browser skip layout + paint for
+   off-screen cards, which is most of the main-thread cost on a catalog page
+   with hundreds of tiles. `contain-intrinsic-size` keeps the scrollbar honest
+   while those tiles are skipped, so nothing jumps as they mount.
+   Apply to the direct child of a grid/list (see LoadMore + the catalog pages). */
+@utility list-window {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
+}
+
+/* Cards that are about to be scrolled into view get promoted, so painting never
+   happens during the scroll itself. */
+@utility list-window-fast {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+  contain: layout paint style;
+}
+
+/* ── Respect the user's motion preference globally ─────────────────
+   The cat and the page transitions already check this in JS; this covers the
+   CSS-only animations (fade-up, float, pulse) for users who asked for calm. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
