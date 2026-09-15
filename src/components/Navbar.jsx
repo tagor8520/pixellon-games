@@ -4,6 +4,7 @@ import { PixellonLogo } from './PixellonLogo'
 
 const navLinks = [
   { to: '/', label: 'Home' },
+  { to: '/world', label: 'World', highlight: true },
   { to: '/news', label: 'News' },
   { to: '/free-games', label: 'Free Games' },
   { to: '/streams', label: 'Streams' },
@@ -32,13 +33,20 @@ export default function Navbar() {
               key={link.to}
               to={link.to}
               end={link.to === '/'}
-              className={({ isActive }) =>
-                `px-3 py-1.5 text-sm font-medium transition-all duration-150 rounded-lg ${
+              className={({ isActive }) => {
+                if (link.highlight) {
+                  return `px-3 py-1.5 text-sm font-medium transition-all duration-150 rounded-lg border ${
+                    isActive
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:bg-emerald-500/15 hover:text-emerald-200'
+                  }`
+                }
+                return `px-3 py-1.5 text-sm font-medium transition-all duration-150 rounded-lg ${
                   isActive
                     ? 'bg-brand-primary/15 text-brand-accent border border-brand-primary/30 shadow-[0_0_12px_rgba(37,99,235,0.25)]'
                     : 'text-brand-muted hover:bg-[#151A24] hover:text-brand-text'
                 }`
-              }
+              }}
             >
               {link.label}
             </NavLink>
@@ -73,13 +81,20 @@ export default function Navbar() {
               to={link.to}
               end={link.to === '/'}
               onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `block px-3.5 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={({ isActive }) => {
+                if (link.highlight) {
+                  return `block px-3.5 py-2 text-sm font-medium rounded-lg transition-colors border ${
+                    isActive
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                      : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                  }`
+                }
+                return `block px-3.5 py-2 text-sm font-medium rounded-lg transition-colors ${
                   isActive
                     ? 'bg-brand-primary/15 text-brand-accent border border-brand-primary/30'
                     : 'text-brand-muted hover:bg-[#151A24] hover:text-brand-text'
                 }`
-              }
+              }}
             >
               {link.label}
             </NavLink>

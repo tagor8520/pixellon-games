@@ -24,7 +24,8 @@
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -35,5 +36,5 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.2"
   },
-  "description": "Gaming hub: news, reviews, deals, streams, esports and an authored game codex \u2014 with a cached, server-side API layer."
+  "description": "Gaming hub: news, reviews, deals, streams, esports and an authored game codex — with a cached, server-side API layer."
 }

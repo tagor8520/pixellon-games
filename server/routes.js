@@ -508,6 +508,77 @@ export function createRoutes({ env, log }) {
         ).then((d) => (Array.isArray(d) ? d : []).map(projectMatch));
       },
     },
+
+    /* ── OSM chunk proxy (free, no key) ─────────────────────────── */
+    {
+      name: 'osmChunk',
+      method: 'GET',
+      match: (p) => (p === '/api/osm/chunk' ? {} : null),
+      policy: opt('osmChunk'),
+      validate: {
+        lat: { type: 'number', min: -85, max: 85 },
+        lon: { type: 'number', min: -180, max: 180 },
+        size: { type: 'number', min: 0.002, max: LIMITS.osmBboxDegMax, default: 0.01 },
+      },
+      handler: async (ctx, { lat, lon, size }) => {
+        const s = Number(size) || 0.01;
+        const half = s / 2;
+        const south = Math.max(-85, lat - half);
+        const north = Math.min(85, lat + half);
+        // normalize lon wrap
+        const west = lon - half;
+        const east = lon + half;
+        const bbox = `${south},${west},${north},${east}`;
+        // Minimal query: buildings + highways, geometries inline
+        const ql = `[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});relation["building"](${bbox}););out geom;`;
+        const body = `data=${encodeURIComponent(ql)}`;
+        const tryFetch = async (base) => {
+          return fetchUpstream(base, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+            signal: ctx.signal,
+            log: ctx.log,
+          });
+        };
+        let data;
+        try {
+          data = await tryFetch(U.overpass);
+        } catch (e) {
+          ctx.log('osmChunk: primary overpass failed, trying mirror', { error: String(e?.message || e) });
+          data = await tryFetch(U.overpassMirror);
+        }
+        // Project / cap — keep payload lightweight for mobile
+        const elements = Array.isArray(data?.elements) ? data.elements : [];
+        // Filter to keep only needed tags and geometry; drop heavy metadata
+        const capped = elements.slice(0, LIMITS.osmMaxElements);
+        const projected = capped.map((el) => {
+          const base = { type: el.type, id: el.id };
+          if (el.tags) {
+            const t = {};
+            if (el.tags.building) t.building = String(el.tags.building).slice(0, 32);
+            if (el.tags.highway) t.highway = String(el.tags.highway).slice(0, 32);
+            if (el.tags['building:levels']) t['building:levels'] = String(el.tags['building:levels']).slice(0, 4);
+            if (el.tags.name) t.name = String(el.tags.name).slice(0, 80);
+            if (Object.keys(t).length) base.tags = t;
+          }
+          if (Array.isArray(el.geometry)) {
+            // quantize to 7 decimals (~1 cm) but store as numbers
+            base.geometry = el.geometry.map((pt) => ({ lat: Number(Number(pt.lat).toFixed(7)), lon: Number(Number(pt.lon).toFixed(7)) }));
+          }
+          if (el.bounds) base.bounds = el.bounds;
+          return base;
+        });
+        return {
+          bbox: { south, west, north, east, size: s, center: { lat, lon } },
+          count: projected.length,
+          total: elements.length,
+          truncated: elements.length > projected.length,
+          elements: projected,
+          source: 'overpass',
+        };
+      },
+    },
   ];
 
   return routes;

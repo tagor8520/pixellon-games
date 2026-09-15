@@ -85,6 +85,13 @@ export default function Home() {
                 >
                   Starter Zone
                 </Link>
+                <Link
+                  to="/world"
+                  id="hero-cta-world"
+                  className="rounded-xl border border-brand-accent/40 bg-brand-accent/10 px-6 py-3 text-sm font-semibold text-brand-accent transition-all duration-200 hover:border-brand-accent hover:bg-brand-accent/15 shadow-[0_0_16px_rgba(96,165,250,0.25)] active:scale-95 cursor-pointer font-sans"
+                >
+                  Enter Coordinates →
+                </Link>
               </div>
             </div>
 
@@ -209,6 +216,52 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
           </Link>
+        </div>
+      </section>
+
+      {/* ── World Engine — Enter Coordinates ────────────────────── */}
+      <section id="world-cta">
+        <div className="relative overflow-hidden rounded-2xl border border-brand-accent/20 bg-gradient-to-br from-[#151A24] via-[#151A24] to-[#10182A] p-6 sm:p-8 lg:p-10">
+          <PixelPatternBg />
+          <div className="relative z-10 grid gap-6 lg:grid-cols-12 items-center">
+            <div className="lg:col-span-7 space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-mono font-semibold tracking-wider text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> NEW • 1:10 SCALE WORLD • BROWSER GENERATION
+              </div>
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-brand-text leading-tight">
+                Explore the Real World — <span className="text-brand-accent">at 1:10 Scale</span>
+              </h3>
+              <p className="text-sm leading-relaxed text-brand-muted">
+                Drop any coordinates and we fetch a tiny OpenStreetMap slice, then procedurally build roads first and buildings next — all on your device. Walk to an edge and the next chunk streams lazily. No key, no install, works offline with a sample.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-3 py-1 text-[11px] font-mono text-brand-muted">30–180 KB / chunk</span>
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-3 py-1 text-[11px] font-mono text-brand-muted">Instanced • ≤5 draws</span>
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-3 py-1 text-[11px] font-mono text-brand-muted">Overpass free API</span>
+              </div>
+            </div>
+            <div className="lg:col-span-5">
+              <div className="rounded-2xl border border-[#1E2638] bg-[#0B0F17] p-5">
+                <div className="flex items-center gap-2 text-[11px] font-mono font-semibold tracking-wider text-brand-accent"><span>🗺️</span> TRY A COORDINATE</div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {[
+                    ['Tokyo', '35.659, 139.700'],
+                    ['New York', '40.758, -73.98'],
+                    ['London', '51.499, -0.124'],
+                  ].map(([city, coords]) => (
+                    <Link key={city} to="/world" className="rounded-xl border border-[#1E2638] bg-[#151A24] px-3 py-2 text-center hover:border-brand-primary/40">
+                      <div className="text-xs font-semibold text-brand-text">{city}</div>
+                      <div className="font-mono text-[10px] text-brand-muted">{coords}</div>
+                    </Link>
+                  ))}
+                </div>
+                <Link to="/world" id="world-cta-enter" className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand-accent px-5 py-3 text-sm font-bold text-[#0B0F17] hover:bg-brand-accent2 shadow-[0_0_16px_rgba(96,165,250,0.35)]">
+                  Enter Coordinates →
+                </Link>
+                <div className="mt-2 text-center font-mono text-[10px] text-brand-muted">No signup • runs at 60 fps on mobile • DPR-capped</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

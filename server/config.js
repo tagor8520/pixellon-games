@@ -25,6 +25,8 @@ export function upstreams(env = {}) {
     rss2json: pick('RSS2JSON_BASE', 'https://api.rss2json.com/v1/api.json'),
     steamspy: pick('STEAMSPY_BASE', 'https://steamspy.com/api.php'),
     newsFeed: pick('NEWS_FEED_URL', 'https://feeds.feedburner.com/ign/news'),
+    overpass: pick('OVERPASS_BASE', 'https://overpass-api.de/api/interpreter'),
+    overpassMirror: pick('OVERPASS_MIRROR_BASE', 'https://overpass.kumi.systems/api/interpreter'),
   };
 }
 
@@ -54,6 +56,7 @@ export const ROUTE_POLICY = {
   news: { ttl: 10 * 60 * SEC, swr: 60 * 60 * SEC },
   streams: { ttl: 2 * 60 * SEC, swr: 10 * 60 * SEC, browser: 30 * SEC },
   esports: { ttl: 5 * 60 * SEC, swr: 30 * 60 * SEC, browser: 60 * SEC },
+  osmChunk: { ttl: 10 * 60 * SEC, swr: 60 * 60 * SEC, browser: 5 * 60 * SEC },
 };
 
 /** How long a 404 from an upstream is remembered, to stop hammering dead ids. */
@@ -71,6 +74,8 @@ export const LIMITS = {
   wikiTags: 6,
   descriptionChars: 40_000,
   newsSummaryChars: 320,
+  osmMaxElements: 4000,
+  osmBboxDegMax: 0.05,
 };
 
 export default { upstreams, ROUTE_POLICY, LIMITS, NEGATIVE_TTL_MS };

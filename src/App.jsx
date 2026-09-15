@@ -30,6 +30,7 @@ const News = lazy(() => import('./pages/News'))
 const Streams = lazy(() => import('./pages/Streams'))
 const Esports = lazy(() => import('./pages/Esports'))
 const Profile = lazy(() => import('./pages/Profile'))
+const World = lazy(() => import('./pages/World'))
 
 /** Shown while a route chunk downloads — matches the app's loading language. */
 function RouteFallback() {
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/streams" element={<Streams />} />
               <Route path="/esports" element={<Esports />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/world" element={<World />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

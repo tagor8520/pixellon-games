@@ -1,0 +1,28 @@
+{
+  "bbox": { "south": 35.658, "west": 139.698, "north": 35.668, "east": 139.708, "size": 0.01, "center": { "lat": 35.663, "lon": 139.703 } },
+  "count": 42,
+  "total": 42,
+  "truncated": false,
+  "elements": [
+    { "type": "way", "id": 1001, "tags": { "highway": "primary" }, "geometry": [{ "lat": 35.6585, "lon": 139.6985 }, { "lat": 35.663, "lon": 139.703 }, { "lat": 35.6675, "lon": 139.707 }] },
+    { "type": "way", "id": 1002, "tags": { "highway": "residential" }, "geometry": [{ "lat": 35.66, "lon": 139.698 }, { "lat": 35.66, "lon": 139.708 }] },
+    { "type": "way", "id": 1003, "tags": { "highway": "residential" }, "geometry": [{ "lat": 35.662, "lon": 139.698 }, { "lat": 35.662, "lon": 139.708 }] },
+    { "type": "way", "id": 1004, "tags": { "highway": "residential" }, "geometry": [{ "lat": 35.664, "lon": 139.698 }, { "lat": 35.664, "lon": 139.708 }] },
+    { "type": "way", "id": 1005, "tags": { "highway": "residential" }, "geometry": [{ "lat": 35.666, "lon": 139.698 }, { "lat": 35.666, "lon": 139.708 }] },
+    { "type": "way", "id": 1006, "tags": { "highway": "secondary" }, "geometry": [{ "lat": 35.658, "lon": 139.702 }, { "lat": 35.668, "lon": 139.702 }] },
+    { "type": "way", "id": 1007, "tags": { "highway": "secondary" }, "geometry": [{ "lat": 35.658, "lon": 139.705 }, { "lat": 35.668, "lon": 139.705 }] },
+    { "type": "way", "id": 2001, "tags": { "building": "yes", "building:levels": "4" }, "geometry": [{ "lat": 35.659, "lon": 139.699 }, { "lat": 35.6595, "lon": 139.699 }, { "lat": 35.6595, "lon": 139.700 }, { "lat": 35.659, "lon": 139.700 }, { "lat": 35.659, "lon": 139.699 }] },
+    { "type": "way", "id": 2002, "tags": { "building": "yes", "building:levels": "6" }, "geometry": [{ "lat": 35.659, "lon": 139.701 }, { "lat": 35.66, "lon": 139.701 }, { "lat": 35.66, "lon": 139.702 }, { "lat": 35.659, "lon": 139.702 }, { "lat": 35.659, "lon": 139.701 }] },
+    { "type": "way", "id": 2003, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.661, "lon": 139.6995 }, { "lat": 35.6616, "lon": 139.6995 }, { "lat": 35.6616, "lon": 139.7005 }, { "lat": 35.661, "lon": 139.7005 }, { "lat": 35.661, "lon": 139.6995 }] },
+    { "type": "way", "id": 2004, "tags": { "building": "yes", "building:levels": "3" }, "geometry": [{ "lat": 35.661, "lon": 139.7035 }, { "lat": 35.6618, "lon": 139.7035 }, { "lat": 35.6618, "lon": 139.7045 }, { "lat": 35.661, "lon": 139.7045 }] },
+    { "type": "way", "id": 2005, "tags": { "building": "apartments" }, "geometry": [{ "lat": 35.6635, "lon": 139.699 }, { "lat": 35.6645, "lon": 139.699 }, { "lat": 35.6645, "lon": 139.7 }, { "lat": 35.6635, "lon": 139.7 }] },
+    { "type": "way", "id": 2006, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.6635, "lon": 139.7005 }, { "lat": 35.664, "lon": 139.7005 }, { "lat": 35.664, "lon": 139.7015 }, { "lat": 35.6635, "lon": 139.7015 }] },
+    { "type": "way", "id": 2007, "tags": { "building": "yes", "building:levels": "10" }, "geometry": [{ "lat": 35.6635, "lon": 139.703 }, { "lat": 35.665, "lon": 139.703 }, { "lat": 35.665, "lon": 139.704 }, { "lat": 35.6635, "lon": 139.704 }] },
+    { "type": "way", "id": 2008, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.6655, "lon": 139.699 }, { "lat": 35.666, "lon": 139.699 }, { "lat": 35.666, "lon": 139.7 }, { "lat": 35.6655, "lon": 139.7 }] },
+    { "type": "way", "id": 2009, "tags": { "building": "retail" }, "geometry": [{ "lat": 35.6655, "lon": 139.7035 }, { "lat": 35.6665, "lon": 139.7035 }, { "lat": 35.6665, "lon": 139.7055 }, { "lat": 35.6655, "lon": 139.7055 }] },
+    { "type": "way", "id": 2010, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.6595, "lon": 139.706 }, { "lat": 35.66, "lon": 139.706 }, { "lat": 35.66, "lon": 139.707 }, { "lat": 35.6595, "lon": 139.707 }] },
+    { "type": "way", "id": 2011, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.661, "lon": 139.7065 }, { "lat": 35.662, "lon": 139.7065 }, { "lat": 35.662, "lon": 139.7075 }, { "lat": 35.661, "lon": 139.7075 }] },
+    { "type": "way", "id": 2012, "tags": { "building": "yes" }, "geometry": [{ "lat": 35.663, "lon": 139.706 }, { "lat": 35.6638, "lon": 139.706 }, { "lat": 35.6638, "lon": 139.707 }, { "lat": 35.663, "lon": 139.707 }] }
+  ],
+  "source": "sample"
+}

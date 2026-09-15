@@ -48,6 +48,17 @@ export function parseParams(searchParams, spec) {
       out[name] = clampInt(n, rule.min, rule.max);
       continue;
     }
+    if (rule.type === 'number') {
+      const n = Number.parseFloat(trimmed);
+      if (Number.isNaN(n)) {
+        invalid.push(`${name} must be a number`);
+        continue;
+      }
+      if (rule.min !== undefined && n < rule.min) { invalid.push(`${name} below minimum`); continue; }
+      if (rule.max !== undefined && n > rule.max) { invalid.push(`${name} above maximum`); continue; }
+      out[name] = n;
+      continue;
+    }
     if (rule.type === 'bool') {
       out[name] = trimmed === 'true' || trimmed === '1';
       continue;

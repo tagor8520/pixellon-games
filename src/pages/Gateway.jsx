@@ -180,6 +180,50 @@ export default function Gateway() {
         </div>
       </section>
 
+      {/* ── Enter Coordinates — New 3rd Option ─────────────────── */}
+      <section id="gateway-world">
+        <div className="relative overflow-hidden rounded-2xl border border-brand-accent/20 bg-gradient-to-br from-[#151A24] to-[#0F172A] p-6 sm:p-8">
+          <PixelPatternBg />
+          <div className="relative z-10 grid gap-6 lg:grid-cols-12 items-center">
+            <div className="lg:col-span-7 space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-mono font-semibold tracking-wider text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> NEW • REAL-WORLD AT 1:10 SCALE
+              </div>
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-brand-text leading-tight">Enter Coordinates — <span className="text-brand-accent">Generate Your World</span></h3>
+              <p className="text-sm leading-relaxed text-brand-muted">
+                The new third path: type any lat/lon (or use your location) and watch a tiny 1×1 Overpass slice turn into a walkable 3D neighbourhood — roads first, buildings next, all rendered in your browser at 1:10 scale. Move to an edge and the next chunk streams lazily behind a fog.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-mono">
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-2.5 py-1 text-brand-muted">~1 km real → ~100 m ingame</span>
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-2.5 py-1 text-brand-muted">No key • works offline</span>
+                <span className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-2.5 py-1 text-brand-muted">Mobile-optimized</span>
+              </div>
+            </div>
+            <div className="lg:col-span-5">
+              <div className="rounded-2xl border border-[#1E2638] bg-[#0B0F17] p-5">
+                <div className="text-[11px] font-mono font-semibold tracking-wider text-brand-accent">QUICK START</div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {[
+                    ['Tokyo', '35.65, 139.70'],
+                    ['NYC', '40.75, -73.98'],
+                    ['Paris', '48.86, 2.33'],
+                  ].map(([city, c]) => (
+                    <Link key={city} to="/world" className="rounded-xl border border-[#1E2638] bg-[#151A24] px-3 py-2 text-center hover:border-brand-primary/40">
+                      <div className="text-xs font-bold text-brand-text">{city}</div>
+                      <div className="font-mono text-[10px] text-brand-muted">{c}</div>
+                    </Link>
+                  ))}
+                </div>
+                <Link to="/world" id="gateway-to-world" className="mt-4 flex w-full items-center justify-center rounded-xl bg-brand-accent px-5 py-3 text-sm font-bold text-[#0B0F17] hover:bg-brand-accent2 shadow-[0_0_16px_rgba(96,165,250,0.35)]">
+                  Enter Coordinates →
+                </Link>
+                <div className="mt-2 text-center font-mono text-[10px] text-brand-muted">Drag = orbit • WASD = walk • Shift = sprint • free Overpass API</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Getting Started CTA ───────────────────────────────── */}
       <section id="gateway-getting-started">
         <div className="rounded-2xl border border-[#1E2638] bg-[#151A24] px-8 py-14 text-center">
@@ -203,6 +247,13 @@ export default function Gateway() {
               className="rounded-xl border border-[#1E2638] bg-[#0B0F17] px-6 py-3 text-sm font-semibold text-brand-text transition-all hover:border-brand-primary/50 cursor-pointer font-sans"
             >
               Discover Indie Gems
+            </Link>
+            <Link
+              to="/world"
+              id="gateway-to-world-alt"
+              className="rounded-xl border border-brand-accent/30 bg-brand-accent/10 px-6 py-3 text-sm font-semibold text-brand-accent transition-all hover:border-brand-accent/50 cursor-pointer font-sans"
+            >
+              Enter Coordinates
             </Link>
           </div>
         </div>

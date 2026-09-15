@@ -59,6 +59,7 @@ export default defineConfig({
               priority: 30,
             },
             { name: 'icons', test: /node_modules[\\/]lucide-react/, priority: 25 },
+            { name: 'three', test: /node_modules[\\/]three/, priority: 22 },
             { name: 'vendor', test: /node_modules/, priority: 10, minSize: 20_000 },
           ],
         },
