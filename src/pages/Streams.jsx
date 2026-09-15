@@ -13,12 +13,17 @@ export default function Streams() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getTopStreams()
+      if (cancelled) return
       setStreams(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Twitch thumbnails are templated ({width}x{height}) — SmartImage asks for the

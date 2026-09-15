@@ -14,13 +14,20 @@ export default function FreeGames() {
   const [platform, setPlatform] = useState('all')
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       setLoading(true)
       const data = await getFreeGames(platform)
+      // Guarded: switching platform quickly (or navigating away) must not write
+      // state into an unmounted tree.
+      if (cancelled) return
       setGames(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [platform])
 
   // The free-to-play catalogue can return dozens of cards per platform; mount

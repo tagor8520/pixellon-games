@@ -82,8 +82,10 @@ for the pixel cat. Plus the bugs found while measuring.
 - **`content:index --check` failed on every run** because it compared a manifest
   containing `generatedAt`. It now compares everything except the timestamp, so the
   CI gate is usable.
-- **Event handlers leaked past unmount.** Catalog pages could `setState` after the
-  component was gone; fetches are now cancelled/guarded (`cancelled`, `AbortController`).
+- **State was written after unmount.** Data pages could `setState` on a component
+  that had already gone away (fast navigation, rapid filter changes). Every
+  auto-fetching page now guards its writes with a `cancelled` flag, and the search
+  box aborts its in-flight request via `AbortController`.
 - **The cat never stopped.** The rAF loop kept scheduling work in background tabs,
   off-screen layouts and print views. It now stops entirely when hidden or
   off-screen, and restarts on return.

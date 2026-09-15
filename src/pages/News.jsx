@@ -13,12 +13,17 @@ export default function News() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getGamingNews()
+      if (cancelled) return
       setArticles(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(articles, { pageSize: 12 })

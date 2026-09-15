@@ -13,12 +13,17 @@ export default function Esports() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getEsportsMatches()
+      if (cancelled) return
       setMatches(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(matches, { pageSize: 12 })
