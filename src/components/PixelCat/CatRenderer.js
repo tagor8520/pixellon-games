@@ -8,6 +8,12 @@
  *
  * Sprite-sheet ready: call setSpriteSheet() and any pose whose `anim` has frames
  * defined is blitted from the sheet instead of being drawn procedurally.
+ *
+ * Cheap repaints: every rect is snapped to whole art pixels, so two poses that
+ * quantise to the same art-pixel layout produce byte-identical output. `draw()`
+ * takes a `force` flag: when false it compares a quantised signature and returns
+ * without touching the canvas when nothing would change. That is what lets an
+ * idle cat cost ~0% CPU instead of redrawing ~150 rects 60 times a second.
  */
 import { ART, PALETTE as C } from './catConfig.js';
 
@@ -78,6 +84,50 @@ export default class CatRenderer {
     this.dpr = 1;
     this.unit = 4;
     this.sheet = null;
+    this._signature = '';
+    this.stats = { draws: 0, skips: 0 };
+  }
+
+  /**
+   * Quantised fingerprint of everything that can change pixels, rounded to the
+   * granularity the renderer actually paints at (whole art pixels). Trig terms
+   * are quantised on their *result*, so a tail sway only counts as a change when
+   * it would move a node by at least half an art pixel.
+   */
+  poseSignature(p) {
+    const q = (value, step = 0.5) => Math.round((value || 0) / step);
+    return [
+      p.anim,
+      q(p.frame, 1),
+      q(p.bob),
+      q(p.lean),
+      q(p.crouch, 0.34),
+      q(p.sit, 0.34),
+      q(p.loaf, 0.34),
+      q(p.stretch, 0.34),
+      q(p.squash, 0.34),
+      q(p.headX, 0.34),
+      q(p.headY, 0.34),
+      q(p.tilt, 0.34),
+      q(p.lookX, 0.34),
+      q(p.lookY, 0.34),
+      q(p.earL, 0.34),
+      q(p.earR, 0.34),
+      q(p.eyeOpen, 0.5),
+      q(p.tailWave, 0.2),
+      q(Math.sin(p.tailPhase || 0), 0.25),
+      q(p.tailUp, 0.2),
+      q(Math.sin(p.legPhase || 0), 0.25),
+      q(p.legMove, 0.34),
+      q(p.pawUp, 0.34),
+      q(p.pawReach, 0.34),
+      q(p.sleep, 0.5),
+      q(p.faceAway, 0.5),
+      q(p.alpha, 0.34),
+      q(p.hangPaws, 0.5),
+      q(p.edgeRow, 1),
+      q(p.zPhase, 0.3),
+    ].join('|');
   }
 
   /** @param {number} scale art px -> CSS px. @param {number} dpr device pixel ratio. */
@@ -122,16 +172,33 @@ export default class CatRenderer {
 
   /* ── main entry ─────────────────────────────────────────────── */
 
-  draw(pose) {
+  /**
+   * @param {object} pose
+   * @param {{ force?: boolean }} [opts] force=true always repaints (default).
+   *        force=false lets the renderer skip a frame whose quantised pose is
+   *        identical to the last one — the caller is expected to bound how long
+   *        it will tolerate skips.
+   * @returns {boolean} true when the canvas was repainted
+   */
+  draw(pose, { force = true } = {}) {
+    const signature = this.poseSignature(pose);
+    if (!force && signature === this._signature) {
+      this.stats.skips++;
+      return false;
+    }
+    this._signature = signature;
+    this.stats.draws++;
+
     const { ctx } = this;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    if (pose.alpha <= 0.01) return;
+    if (pose.alpha <= 0.01) return true;
     ctx.globalAlpha = pose.alpha;
 
     if (this.sheet && this.sheet.frames && this.sheet.frames[pose.anim]) this.drawSprite(pose);
     else this.drawParts(pose);
 
     ctx.globalAlpha = 1;
+    return true;
   }
 
   drawSprite(pose) {

@@ -64,6 +64,37 @@ export const CAT_CONFIG = {
   alertSpeed: 1400, // px/s of cursor movement that startles the cat
   stareBonus: 2200, // extra interest ms when the cursor holds still
 
+  /* ── device budget ────────────────────────────────────────────
+     The cat is decorative. It must never be the reason a low-end phone is
+     warm, out of battery, or dropping scroll frames. Everything here is a
+     ceiling that the runtime lowers further when it measures that the device
+     cannot keep up (see PixelCat.jsx `frame` loop).
+
+       stride          draw 1 frame out of N. The simulation is dt-based, so a
+                       stride only changes how often we paint, never how fast
+                       the cat moves.
+       slowFrameMs     measured work per frame above which we add a stride.
+       maxSkippedDraws hard ceiling on consecutive skipped canvas draws, so a
+                       nearly-static pose can never look frozen.
+       skipUnchanged   skip repainting when the quantised pose would produce the
+                       same pixels (the renderer snaps to whole art pixels, so
+                       this is safe by construction, not an approximation). */
+  quality: {
+    highStride: 1,
+    lowPowerStride: 2,
+    slowStride: 2,
+    verySlowStride: 3,
+    slowFrameMs: 7,
+    verySlowFrameMs: 12,
+    recoverFrameMs: 4,
+    evaluateEveryFrames: 90,
+    maxSkippedDraws: 3,
+    skipUnchanged: true,
+    lowPowerCores: 4,
+    lowPowerMemoryGb: 4,
+    idleStride: 2, // when the pose is static, double the interval before giving up
+  },
+
   /* ── animation limits (subtle on purpose) ─────────────────── */
   maxHeadTiltDeg: 15,
   headOffsetPx: 2.2, // art px of head travel when looking

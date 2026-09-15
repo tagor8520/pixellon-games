@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Newspaper, Loader2, ExternalLink, Calendar } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import SmartImage from '../components/SmartImage'
+import LoadMore from '../components/LoadMore'
+import useIncrementalList from '../hooks/useIncrementalList'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
 import { getGamingNews } from '../utils/api'
 
@@ -10,13 +13,20 @@ export default function News() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getGamingNews()
+      if (cancelled) return
       setArticles(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(articles, { pageSize: 12 })
 
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'short', day: 'numeric' }
@@ -57,22 +67,24 @@ export default function News() {
           </div>
         ) : (
           <div className="grid gap-5">
-            {articles.map((article, i) => (
+            {visible.map((article, i) => (
               <motion.article
                 key={article.guid || i}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="group relative flex flex-col gap-6 rounded-xl border border-[#1E2638] bg-[#151A24] p-5 transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.2)] sm:flex-row"
+                className="list-window-fast group relative flex flex-col gap-6 rounded-xl border border-[#1E2638] bg-[#151A24] p-5 transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.2)] sm:flex-row"
               >
                 {/* Thumbnail */}
                 {(article.enclosure?.link || article.thumbnail) && (
                   <div className="relative aspect-video w-full flex-shrink-0 overflow-hidden rounded-lg sm:w-64 sm:aspect-[4/3]">
-                    <img
-                      src={article.enclosure?.link || article.thumbnail}
+                    <SmartImage
+                      src={article.thumbnail || article.enclosure?.link}
                       alt={article.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
+                      className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                      ratio="4/3"
+                      widths={[160, 240, 320]}
+                      sizes="(max-width: 640px) 92vw, 256px"
                     />
                   </div>
                 )}
@@ -104,6 +116,8 @@ export default function News() {
                 </div>
               </motion.article>
             ))}
+
+            <LoadMore sentinelRef={sentinelRef} remaining={remaining} onLoadMore={loadMore} label="Older headlines" />
           </div>
         )}
       </div>

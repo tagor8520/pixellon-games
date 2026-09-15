@@ -1,3 +1,5 @@
+import SmartImage from './SmartImage'
+
 const TAG_COLORS = {
   blue: 'bg-brand-primary/15 text-brand-accent border-brand-primary/30',
   accent: 'bg-brand-accent/15 text-brand-accent2 border-brand-accent/30',
@@ -28,14 +30,15 @@ export default function GameCard({
     return (
       <article
         onClick={onClick}
-        className="group relative overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-300 hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1 cursor-pointer"
+        className="list-window group relative overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-300 hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1 cursor-pointer"
       >
         <div className="relative aspect-[16/9] overflow-hidden">
-          <img
+          <SmartImage
             src={image}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            loading="lazy"
+            className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+            widths={[640, 960, 1280]}
+            sizes="(max-width: 1024px) 92vw, 720px"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/50 to-transparent" />
 
@@ -83,11 +86,12 @@ export default function GameCard({
         className="group flex gap-4 rounded-xl border border-[#1E2638] bg-[#151A24] p-3 transition-all duration-200 hover:border-brand-primary/50 hover:shadow-md cursor-pointer"
       >
         <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg">
-          <img
+          <SmartImage
             src={image}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
+            className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+            widths={[80, 160]}
+            sizes="80px"
           />
           {rating && (
             <div className="absolute bottom-1 right-1 flex h-5 w-7 items-center justify-center rounded bg-[#0B0F17] border border-[#1E2638]">
@@ -116,14 +120,15 @@ export default function GameCard({
   return (
     <article
       onClick={onClick}
-      className="group flex flex-col h-full overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-200 hover:border-brand-primary hover:shadow-[0_0_16px_rgba(37,99,235,0.2)] hover:-translate-y-1 cursor-pointer"
+      className="list-window group flex flex-col h-full overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-200 hover:border-brand-primary hover:shadow-[0_0_16px_rgba(37,99,235,0.2)] hover:-translate-y-1 cursor-pointer"
     >
       <div className="relative aspect-[16/10] overflow-hidden">
-        <img
+        <SmartImage
           src={image}
           alt={title}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          loading="lazy"
+          className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+          widths={[320, 480, 640]}
+          sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 380px"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#151A24] via-[#151A24]/30 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
 

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Tag, Loader2, ExternalLink } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import SmartImage from '../components/SmartImage'
+import LoadMore from '../components/LoadMore'
+import useIncrementalList from '../hooks/useIncrementalList'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
+import { getDeals } from '../utils/api'
 
 export default function Deals() {
   const [deals, setDeals] = useState([])
@@ -9,21 +13,28 @@ export default function Deals() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchDeals() {
       try {
-        const res = await fetch('https://www.cheapshark.com/api/1.0/deals?storeID=1&sortBy=DealRating')
-        if (!res.ok) throw new Error('Failed to fetch deals')
-        const data = await res.json()
-        setDeals(data.slice(0, 24))
+        // CheapShark via our cached route: one upstream call per 10 minutes for
+        // the whole site instead of one per visitor.
+        const data = await getDeals()
+        if (!cancelled) setDeals(data)
       } catch (err) {
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchDeals()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  // 60 deals is 60 images and 60 cards; mount them in windows instead.
+  const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(deals, { pageSize: 24 })
 
   return (
     <PageTransition className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
@@ -65,20 +76,23 @@ export default function Deals() {
 
       {!loading && !error && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {deals.map((deal) => (
+          {visible.map((deal) => (
             <a
               key={deal.dealID}
               href={`https://www.cheapshark.com/redirect?dealID=${deal.dealID}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1 cursor-pointer"
+              className="list-window group flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1 cursor-pointer"
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-[#0B0F17] p-2">
-                <img
+                <SmartImage
                   src={deal.thumb}
                   alt={deal.title}
-                  className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                  objectFit="contain"
+                  ratio="16/9"
+                  widths={[240, 360]}
+                  sizes="(max-width: 640px) 45vw, 240px"
                 />
                 <div className="absolute right-2.5 top-2.5 rounded bg-brand-primary px-2 py-0.5 text-xs font-mono font-bold text-white shadow-md">
                   -{Math.round(deal.savings)}%
@@ -103,6 +117,10 @@ export default function Deals() {
             </a>
           ))}
         </div>
+      )}
+
+      {!loading && !error && (
+        <LoadMore sentinelRef={sentinelRef} remaining={remaining} onLoadMore={loadMore} label="More deals" />
       )}
     </PageTransition>
   )

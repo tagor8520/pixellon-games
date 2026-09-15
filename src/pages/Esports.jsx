@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Trophy, Calendar, Clock, Loader2, Gamepad2, Shield } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import SmartImage from '../components/SmartImage'
+import LoadMore from '../components/LoadMore'
+import useIncrementalList from '../hooks/useIncrementalList'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
 import { getEsportsMatches } from '../utils/api'
 
@@ -10,13 +13,20 @@ export default function Esports() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getEsportsMatches()
+      if (cancelled) return
       setMatches(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(matches, { pageSize: 12 })
 
   const formatMatchTime = (dateString) => {
     const date = new Date(dateString)
@@ -66,18 +76,25 @@ export default function Esports() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {matches.map((match, i) => (
+            {visible.map((match, i) => (
               <motion.article
                 key={match.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="group flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)]"
+                className="list-window group flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)]"
               >
                 {/* League Header */}
                 <div className="flex items-center gap-3 border-b border-[#1E2638] bg-[#0B0F17] px-5 py-3">
                   {match.league.image_url ? (
-                    <img src={match.league.image_url} alt={match.league.name} className="h-7 w-7 object-contain" />
+                    <SmartImage
+                      src={match.league.image_url}
+                      alt={match.league.name}
+                      className="h-7 w-7"
+                      objectFit="contain"
+                      widths={[48]}
+                      sizes="28px"
+                    />
                   ) : (
                     <div className="flex h-7 w-7 items-center justify-center rounded bg-[#151A24] border border-[#1E2638]">
                       <Gamepad2 className="h-3.5 w-3.5 text-brand-muted" />
@@ -148,6 +165,10 @@ export default function Esports() {
               </motion.article>
             ))}
           </div>
+        )}
+
+        {!loading && (
+          <LoadMore sentinelRef={sentinelRef} remaining={remaining} onLoadMore={loadMore} label="More matches" />
         )}
       </div>
     </PageTransition>

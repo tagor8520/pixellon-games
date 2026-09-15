@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "key": "e",
+  "games": {
+    "326243": {
+      "title": "Elden Ring",
+      "slug": "elden-ring",
+      "genre": "Action RPG",
+      "platforms": [
+        "PC",
+        "PS5",
+        "Xbox"
+      ],
+      "tags": [
+        "soulslike",
+        "open world",
+        "co-op",
+        "fromsoftware"
+      ],
+      "aliases": [
+        "ER",
+        "Elden Ring Nightreign"
+      ],
+      "updated": "2026-09-01",
+      "pages": [
+        "home",
+        "bosses",
+        "builds"
+      ],
+      "hasLocalContent": true
+    }
+  }
+}

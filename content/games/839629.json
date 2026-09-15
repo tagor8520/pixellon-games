@@ -1,0 +1,20 @@
+{
+  "id": "839629",
+  "slug": "persona-3-reload",
+  "title": "Persona 3 Reload",
+  "genre": "Turn-Based RPG",
+  "platforms": ["PC", "PS5", "Xbox"],
+  "tags": ["jrpg", "atlus", "turn-based", "social sim"],
+  "aliases": ["P3R"],
+  "updated": "2026-08-20",
+  "pages": {
+    "home": {
+      "title": "Overview",
+      "content": "# Persona 3 Reload\n\nA ground-up remake of the 2006 original. This document is the *minimum* shape a content file can have: one `home` page plus metadata.\n\n## Editors' note\n\nKeep page bodies under ~50 KB each. The runtime fetches exactly one file per page, so a fat page only ever costs the reader who opens it — but a fat page still costs that reader everything."
+    },
+    "social-links": {
+      "title": "Social Links",
+      "content": "## Priority order for a first run\n\n1. **Fool** — automatic\n2. **Magician** (Kenji) — early access to strong fusion fodder\n3. **Hierophant** (Bunkichi) — cheap stat gains\n4. **Priestess** (Fuuka) — support skills that scale into the late game\n\n> Missing a Social Link is normal. The schedule is generous after the summer."
+    }
+  }
+}

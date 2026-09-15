@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Tv, Users, Loader2, Play } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import SmartImage from '../components/SmartImage'
+import LoadMore from '../components/LoadMore'
+import useIncrementalList from '../hooks/useIncrementalList'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
 import { getTopStreams } from '../utils/api'
 
@@ -10,17 +13,22 @@ export default function Streams() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       const data = await getTopStreams()
+      if (cancelled) return
       setStreams(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const getThumbnail = (url, width = 640, height = 360) => {
-    return url.replace('{width}', width).replace('{height}', height)
-  }
+  // Twitch thumbnails are templated ({width}x{height}) — SmartImage asks for the
+  // size the card actually renders instead of the provider default.
+  const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(streams, { pageSize: 12 })
 
   return (
     <PageTransition>
@@ -64,20 +72,22 @@ export default function Streams() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {streams.map((stream, i) => (
+            {visible.map((stream, i) => (
               <motion.article
                 key={stream.id}
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.03 }}
-                className="group relative flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1"
+                className="list-window group relative flex flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1"
               >
                 <div className="relative aspect-video overflow-hidden">
-                  <img
-                    src={getThumbnail(stream.thumbnail_url)}
+                  <SmartImage
+                    src={stream.thumbnail_url}
                     alt={stream.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
+                    className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+                    ratio="16/9"
+                    widths={[320, 480, 640]}
+                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 320px"
                   />
                   <div className="absolute inset-0 bg-[#0B0F17]/30 group-hover:bg-transparent transition-colors" />
                   
@@ -117,6 +127,8 @@ export default function Streams() {
             ))}
           </div>
         )}
+
+        <LoadMore sentinelRef={sentinelRef} remaining={remaining} onLoadMore={loadMore} label="More streams" />
       </div>
     </PageTransition>
   )

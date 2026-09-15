@@ -7,7 +7,9 @@ import WikiNavbar from '../components/WikiNavbar';
 import Infobox from '../components/Infobox';
 import WikiSidebar from '../components/WikiSidebar';
 import PageTransition from '../components/PageTransition';
-import { getGameDetails, getSteamAppId, getSteamDetails, getIGDBDetails, getTopStreams } from '../utils/api';
+import { getWikiBundle } from '../utils/api';
+import { loadGameContent } from '../data/contentIndex';
+import SmartImage from '../components/SmartImage';
 import { Trash2, Edit3, Plus, Save, X, Eye, Loader2 } from 'lucide-react';
 
 export default function GameWiki() {
@@ -24,141 +26,102 @@ export default function GameWiki() {
  const [editContent, setEditContent] = useState('');
  const [previewMode, setPreviewMode] = useState(false);
 
- const formatSteamReqs = (htmlString) => {
- if (!htmlString) return '';
- return htmlString
- .replace(/<br\s*\/?>/gi, '\n')
- .replace(/<li[^>]*>/gi, '\n- ')
- .replace(/<[^>]+>/g, '') 
- .replace(/\n\s*\n/g, '\n') 
- .trim();
- };
-
  useEffect(() => {
- async function loadGame() {
- setLoading(true);
- const details = await getGameDetails(gameId);
- if (details) {
- 
- let steamPrice = null;
- let steamReqsFormatted = '';
- let controllerSupport = null;
+   let cancelled = false;
 
- // Fetch parallel data
- const [appId, igdbData, twitchStreams] = await Promise.all([
- getSteamAppId(gameId),
- getIGDBDetails(details.name),
- getTopStreams(details.name)
- ]);
+   async function loadGame() {
+     setLoading(true);
+     try {
+       // Two independent sources, in parallel:
+       //   • authored content from content/games/<id>.json (its own chunk, zero API cost)
+       //   • the cached /api/wiki composite — 1 request instead of the 5-6
+       //     waterfalled calls this page used to fire from the browser
+       // Either one alone is enough to render a page.
+       const [local, remote] = await Promise.all([
+         loadGameContent(gameId).catch(() => null),
+         getWikiBundle(gameId).catch((error) => {
+           if (import.meta.env.DEV) console.warn('[codex] api bundle unavailable', error?.message);
+           return null;
+         }),
+       ]);
 
- if (appId) {
- const steamDetails = await getSteamDetails(appId);
- if (steamDetails) {
- if (steamDetails.price_overview) {
- steamPrice = steamDetails.price_overview.final_formatted;
- } else if (steamDetails.is_free) {
- steamPrice = "Free to Play";
- }
- 
- if (steamDetails.pc_requirements) {
- if (steamDetails.pc_requirements.minimum) {
- steamReqsFormatted += `\n### Minimum Requirements\n${formatSteamReqs(steamDetails.pc_requirements.minimum)}\n`;
- }
- if (steamDetails.pc_requirements.recommended) {
- steamReqsFormatted += `\n### Recommended Requirements\n${formatSteamReqs(steamDetails.pc_requirements.recommended)}\n`;
- }
- }
- if (steamDetails.controller_support === 'full') {
- controllerSupport = 'Full Controller Support';
- }
- }
- }
+       if (cancelled) return;
 
- const infoData = [
- { label: 'Developer', value: details.developers?.map(d => d.name).join(', ') || 'Unknown' },
- { label: 'Publisher', value: details.publishers?.map(p => p.name).join(', ') || 'Unknown' },
- { label: 'Release Date', value: details.released || 'TBA' },
- ];
+       if (!local && !remote) {
+         setWikiData(null);
+         return;
+       }
 
- if (details.playtime) {
- infoData.push({ label: 'Avg Playtime', value: `${details.playtime} Hours` });
- }
- if (details.esrb_rating) {
- infoData.push({ label: 'ESRB Rating', value: details.esrb_rating.name });
- }
+       const steam = remote?.steam || null;
+       const infoData = [];
 
- infoData.push(
- { label: 'Genre', value: details.genres?.map(g => g.name).join(', ') || 'Unknown' },
- { label: 'Metacritic', value: details.metacritic ? details.metacritic.toString() : 'N/A' }
- );
+       if (remote) {
+         infoData.push(
+           { label: 'Developer', value: remote.developers?.map((d) => d.name).join(', ') || 'Unknown' },
+           { label: 'Publisher', value: remote.publishers?.map((p) => p.name).join(', ') || 'Unknown' },
+           { label: 'Release Date', value: remote.released || 'TBA' },
+         );
+         if (remote.playtime) infoData.push({ label: 'Avg Playtime', value: `${remote.playtime} Hours` });
+         if (remote.esrb_rating) infoData.push({ label: 'ESRB Rating', value: remote.esrb_rating.name });
+         infoData.push(
+           { label: 'Genre', value: remote.genres?.map((g) => g.name).join(', ') || local?.genre || 'Unknown' },
+           { label: 'Metacritic', value: remote.metacritic ? remote.metacritic.toString() : 'N/A' },
+         );
+         if (steam?.price) infoData.push({ label: 'Steam Price', value: steam.price });
+         if (steam?.controller_support) infoData.push({ label: 'Controller', value: steam.controller_support });
+         if (remote.website) infoData.push({ label: 'Website', value: remote.website, type: 'link' });
+         if (remote.reddit_url) infoData.push({ label: 'Reddit', value: remote.reddit_url, type: 'link' });
+         if (remote.tags?.length) {
+           const tags = remote.tags.slice(0, 6).map((t) => t.name);
+           if (tags.length) infoData.push({ label: 'Tags', value: tags, type: 'tags' });
+         }
+         if (remote.steamAppId) infoData.push({ label: 'Steam App ID', value: String(remote.steamAppId) });
+         if (remote.igdb?.involved_companies?.length) {
+           infoData.push({
+             label: 'IGDB Companies',
+             value: remote.igdb.involved_companies.map((c) => c.company.name).join(', '),
+           });
+         }
+       }
 
- if (steamPrice) {
- infoData.push({ label: 'Steam Price', value: steamPrice });
- }
- if (controllerSupport) {
- infoData.push({ label: 'Controller', value: controllerSupport });
- }
- if (details.website) {
- infoData.push({ label: 'Website', value: details.website, type: 'link' });
- }
- if (details.reddit_url) {
- infoData.push({ label: 'Reddit', value: details.reddit_url, type: 'link' });
- }
- 
- if (details.tags && details.tags.length > 0) {
- const validTags = details.tags
- .filter(t => t.language === 'eng')
- .map(t => t.name)
- .slice(0, 6);
- if (validTags.length > 0) {
- infoData.push({ label: 'Tags', value: validTags, type: 'tags' });
- }
- }
+       // Authored pages win over API-derived ones; if there is no home page yet we
+       // generate one so a game with no local document still renders.
+       const pages = local?.pages ? { ...local.pages } : {};
+       if (!pages.home) {
+         let content = remote?.description_raw
+           ? `# Overview\n\n${remote.description_raw}`
+           : `# Welcome to the ${remote?.name || local?.title} Codex!\n\nInformation is currently limited. Be the first to add to this wiki!`;
+         if (remote?.igdb?.storyline) content += `\n\n## Storyline (IGDB)\n\n${remote.igdb.storyline}`;
+         const requirements = [];
+         if (steam?.requirements?.minimum) requirements.push(`\n### Minimum Requirements\n${steam.requirements.minimum}\n`);
+         if (steam?.requirements?.recommended) requirements.push(`\n### Recommended Requirements\n${steam.requirements.recommended}\n`);
+         if (requirements.length) content += `\n\n## PC System Requirements\n${requirements.join('')}`;
+         pages.home = { title: 'Overview', content };
+       }
 
- if (appId) {
- infoData.push({ label: 'Steam App ID', value: appId.toString() });
- }
- 
- if (igdbData && igdbData.involved_companies) {
- const companies = igdbData.involved_companies.map(c => c.company.name).join(', ');
- infoData.push({ label: 'IGDB Companies', value: companies });
- }
+       setWikiData({
+         id: gameId,
+         title: local?.title || remote?.name || `Game ${gameId}`,
+         banner:
+           local?.banner ||
+           remote?.background_image_additional ||
+           remote?.background_image ||
+           'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80',
+         infoboxImage: remote?.background_image || local?.banner || null,
+         infoboxData: infoData,
+         igdbData: remote?.igdb || null,
+         source: local && remote ? 'authored + api' : local ? 'authored' : 'api',
+         pages,
+       });
+     } finally {
+       if (!cancelled) setLoading(false);
+     }
+   }
 
- // Build base wiki data
- let contentStr = details.description_raw 
- ? `# Overview\n\n${details.description_raw}` 
- : `# Welcome to the ${details.name} Codex!\n\nInformation is currently limited. Be the first to add to this wiki!`;
- 
- if (igdbData && igdbData.storyline) {
- contentStr += `\n\n## Storyline (IGDB)\n\n${igdbData.storyline}`;
- }
- 
- if (steamReqsFormatted) {
- contentStr += `\n\n## PC System Requirements\n${steamReqsFormatted}`;
- }
-
- const baseData = {
- id: gameId,
- title: details.name,
- banner: details.background_image_additional || details.background_image || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80',
- infoboxImage: details.background_image || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80',
- infoboxData: infoData,
- igdbData,
- twitchStreams,
- pages: {
- 'home': {
- title: 'Overview',
- content: contentStr
- }
- }
- };
- setWikiData(baseData);
- } else {
- setWikiData(null);
- }
- setLoading(false);
- }
- loadGame();
+   loadGame();
+   return () => {
+     cancelled = true;
+   };
  }, [gameId]);
 
  // Merge base pages with custom user pages
@@ -239,10 +202,13 @@ export default function GameWiki() {
     <PageTransition className="min-h-screen bg-[#0B0F17]">
       {/* Banner */}
       <div className="relative h-64 sm:h-80 w-full overflow-hidden group">
-        <img 
-          src={wikiData.banner} 
-          alt={`${wikiData.title} Banner`} 
-          className="absolute inset-0 h-full w-full object-cover"
+        <SmartImage
+          src={wikiData.banner}
+          alt={`${wikiData.title} Banner`}
+          className="absolute inset-0 h-full w-full"
+          priority
+          widths={[768, 1280, 1920]}
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/60 to-transparent" />
         <div className="absolute bottom-0 left-0 w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto pb-6 flex justify-between items-end">

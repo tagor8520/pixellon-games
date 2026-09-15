@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, BookOpen, Loader2 } from 'lucide-react';
 import PageTransition from '../components/PageTransition';
+import SmartImage from '../components/SmartImage';
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations';
 import { getGamesByGenre, searchGames } from '../utils/api';
+import { searchContentIndex } from '../data/contentIndex';
 
 const CATEGORIES = [
   { id: 'role-playing-games-rpg', title: 'Role-Playing Games' },
@@ -41,18 +43,44 @@ export default function CodexHub() {
   }, []);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.length > 2) {
-        setIsSearching(true);
-        const results = await searchGames(searchQuery);
-        setSearchResults(results);
-        setIsSearching(false);
-      } else {
-        setSearchResults([]);
-      }
-    }, 500);
+    const term = searchQuery.trim();
+    if (term.length < 3) {
+      setSearchResults([]);
+      return undefined;
+    }
 
-    return () => clearTimeout(delayDebounceFn);
+    // Local content index first: authored Codex pages are searched in the
+    // browser from a small shard, so typing costs zero upstream quota. Only if
+    // that comes back empty do we spend a cached API search.
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const local = await searchContentIndex(term, { limit: 6 });
+        if (local.length) {
+          setSearchResults(
+            local.map((entry) => ({
+              id: entry.id,
+              title: entry.title,
+              genre: entry.genre || 'Codex',
+              developer: entry.platforms?.join(' • '),
+              image: entry.banner || null,
+            })),
+          );
+          return;
+        }
+        setSearchResults(await searchGames(term, { signal: controller.signal }));
+      } catch (error) {
+        if (error?.name !== 'AbortError' && import.meta.env.DEV) console.warn(error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   const GameGrid = ({ games }) => (
@@ -61,10 +89,16 @@ export default function CodexHub() {
         <Link
           key={game.id}
           to={`/codex/${game.id}`}
-          className="group block rounded-xl bg-[#151A24] border border-[#1E2638] hover:border-brand-primary transition-all overflow-hidden shadow-sm hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1"
+          className="list-window group block rounded-xl bg-[#151A24] border border-[#1E2638] hover:border-brand-primary transition-all overflow-hidden shadow-sm hover:shadow-[0_0_20px_rgba(37,99,235,0.25)] hover:-translate-y-1"
         >
           <div className="relative h-56 w-full overflow-hidden border-b border-[#1E2638] group-hover:border-brand-primary/50 transition-colors">
-            <img src={game.image} alt={game.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <SmartImage
+              src={game.image}
+              alt={game.title}
+              className="w-full h-full transition-transform duration-700 group-hover:scale-105"
+              widths={[320, 480, 640]}
+              sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 380px"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/40 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
               <h2 className="font-display text-xl sm:text-2xl font-bold text-brand-text drop-shadow group-hover:text-brand-accent transition-colors">

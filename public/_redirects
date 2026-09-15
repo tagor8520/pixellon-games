@@ -1,0 +1,4 @@
+# SPA fallback: React Router owns every non-asset, non-API path.
+# Without this, deep links (/codex/326243/bosses) 404 on a static host.
+/api/*  /api/:splat  200
+/*      /index.html  200

@@ -5,7 +5,7 @@ import SectionHeader from '../components/SectionHeader'
 import PageTransition from '../components/PageTransition'
 import { PixellonIcon } from '../components/PixellonLogo'
 import { BrandPillarsBar, PixelCross, PixelPatternBg } from '../components/BrandDecorations'
-import { getTrendingGames, getHighlyRatedGames, getUpcomingGames } from '../utils/api'
+import { getHomeBundle } from '../utils/api'
 
 export default function Home() {
   const [trendingGames, setTrendingGames] = useState([])
@@ -14,23 +14,26 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function loadData() {
       try {
-        const [trending, reviews, upcoming] = await Promise.all([
-          getTrendingGames(),
-          getHighlyRatedGames(),
-          getUpcomingGames(),
-        ])
-        setTrendingGames(trending)
-        setRecentReviews(reviews)
-        setUpcomingReleases(upcoming)
+        // One request for the whole page: the server fans out to RAWG once and
+        // caches the result, instead of the browser making three cold calls.
+        const { trending, topRated, upcoming } = await getHomeBundle()
+        if (cancelled) return
+        setTrendingGames(trending || [])
+        setRecentReviews(topRated || [])
+        setUpcomingReleases(upcoming || [])
       } catch (err) {
-        console.error('Failed to load home page data', err)
+        if (import.meta.env.DEV) console.warn('Home data unavailable', err?.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     loadData()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (loading) {

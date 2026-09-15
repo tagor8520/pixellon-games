@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { User, Search, Loader2, Gamepad2, Clock, AlertCircle } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
-import { getSteamProfile, getSteamOwnedGames } from '../utils/api'
+import SmartImage from '../components/SmartImage'
+import { getSteamPlayer } from '../utils/api'
 
 export default function Profile() {
   const [steamId, setSteamId] = useState('')
@@ -24,19 +25,21 @@ export default function Profile() {
     setSearched(true)
 
     try {
-      const p = await getSteamProfile(steamId)
-      if (!p) {
+      // One cached request for both profile and library (they used to be two
+      // sequential round trips through two separate upstream calls).
+      const data = await getSteamPlayer(steamId)
+      if (!data?.profile) {
         setError('Profile not found. Ensure the Steam ID is correct and the profile is public.')
-        setLoading(false)
         return
       }
-      setProfile(p)
-
-      const g = await getSteamOwnedGames(steamId)
-      const sortedGames = g.sort((a, b) => b.playtime_forever - a.playtime_forever).slice(0, 12)
-      setGames(sortedGames)
+      setProfile(data.profile)
+      setGames((data.games || []).slice(0, 12))
     } catch (err) {
-      setError('An error occurred while fetching profile data.')
+      setError(
+        err?.status === 404
+          ? 'Profile not found. Ensure the Steam ID is correct and the profile is public.'
+          : 'An error occurred while fetching profile data.',
+      )
     } finally {
       setLoading(false)
     }
@@ -138,11 +141,18 @@ export default function Profile() {
                 <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                   {games.map((game) => (
                     <div key={game.appid} className="flex items-center gap-3.5 rounded-xl bg-[#0B0F17] border border-[#1E2638] p-3">
-                      <img
-                        src={`http://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`}
+                      {/* https, not http: the old URL was mixed content on an
+                          https page, so browsers blocked the icon entirely. */}
+                      <SmartImage
+                        src={
+                          game.img_icon_url
+                            ? `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.img_icon_url}.jpg`
+                            : null
+                        }
                         alt={game.name}
-                        className="h-10 w-10 rounded shadow"
-                        onError={(e) => { e.target.style.display = 'none' }}
+                        className="h-10 w-10 flex-shrink-0 rounded shadow"
+                        widths={[40, 64]}
+                        sizes="40px"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-display font-bold text-brand-text" title={game.name}>

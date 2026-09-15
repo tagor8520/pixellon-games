@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Secrets — .env holds the API keys that used to be committed and shipped in the
+# client bundle. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Local caches / generated reports
+.cache
+stats.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

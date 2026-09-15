@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Gift, Filter, Loader2, Monitor, LayoutGrid } from 'lucide-react'
 import PageTransition from '../components/PageTransition'
+import SmartImage from '../components/SmartImage'
+import LoadMore from '../components/LoadMore'
+import useIncrementalList from '../hooks/useIncrementalList'
 import { PixelPatternBg, PixelCross } from '../components/BrandDecorations'
 import { getFreeGames } from '../utils/api'
 
@@ -11,14 +14,25 @@ export default function FreeGames() {
   const [platform, setPlatform] = useState('all')
 
   useEffect(() => {
+    let cancelled = false
     async function fetchData() {
       setLoading(true)
       const data = await getFreeGames(platform)
+      // Guarded: switching platform quickly (or navigating away) must not write
+      // state into an unmounted tree.
+      if (cancelled) return
       setGames(data)
       setLoading(false)
     }
     fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [platform])
+
+  // The free-to-play catalogue can return dozens of cards per platform; mount
+  // them in windows so switching platform filters stays instant.
+  const { visible, remaining, loadMore, sentinelRef } = useIncrementalList(games, { pageSize: 16 })
 
   return (
     <PageTransition>
@@ -83,20 +97,22 @@ export default function FreeGames() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {games.map((game, i) => (
+            {visible.map((game, i) => (
               <motion.article
                 key={game.id}
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.03 }}
-                className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-300 hover:-translate-y-1 hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)]"
+                className="list-window group flex h-full flex-col overflow-hidden rounded-xl border border-[#1E2638] bg-[#151A24] transition-all duration-300 hover:-translate-y-1 hover:border-brand-primary hover:shadow-[0_0_20px_rgba(37,99,235,0.25)]"
               >
                 <div className="relative aspect-[16/9] overflow-hidden">
-                  <img
+                  <SmartImage
                     src={game.thumbnail}
                     alt={game.title}
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    loading="lazy"
+                    className="h-full w-full transition-transform duration-700 group-hover:scale-105"
+                    ratio="16/9"
+                    widths={[320, 480, 640]}
+                    sizes="(max-width: 640px) 92vw, (max-width: 1024px) 45vw, 320px"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/40 to-transparent" />
                   <div className="absolute right-3 top-3 rounded bg-brand-primary px-2.5 py-0.5 text-[10px] font-mono font-bold text-white shadow-md">
@@ -132,6 +148,10 @@ export default function FreeGames() {
               </motion.article>
             ))}
           </div>
+        )}
+
+        {!loading && (
+          <LoadMore sentinelRef={sentinelRef} remaining={remaining} onLoadMore={loadMore} label="More free games" />
         )}
       </div>
     </PageTransition>

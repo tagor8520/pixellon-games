@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
 import Infobox from './Infobox';
+import { getSteamSpy } from '../utils/api';
 
 export default function WikiSidebar({ gameId, pages, wikiData }) {
   const [steamData, setSteamData] = useState(null);
@@ -14,16 +15,14 @@ export default function WikiSidebar({ gameId, pages, wikiData }) {
   useEffect(() => {
     if (!appId) return;
     
+    // SteamSpy through /api/steamspy — cached at the edge, and the browser never
+    // talks to a third party directly (no CORS roulette, no wasted cold calls).
     async function fetchSteamData() {
       setLoadingSteam(true);
       try {
-        const res = await fetch(`https://steamspy.com/api.php?request=appdetails&appid=${appId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSteamData(data);
-        }
+        setSteamData(await getSteamSpy(appId));
       } catch (err) {
-        console.error("Failed to fetch SteamSpy data", err);
+        if (import.meta.env.DEV) console.warn('SteamSpy unavailable', err?.message);
       } finally {
         setLoadingSteam(false);
       }
