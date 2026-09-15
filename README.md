@@ -10,6 +10,7 @@ response shape.
 
 * **How it works** → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * **Cost, scale and performance plan** → [`docs/SCALE-PLAN.md`](docs/SCALE-PLAN.md)
+* **What changed, and what was fixed** → [`CHANGELOG.md`](CHANGELOG.md)
 * **Authoring Codex content** → [`content/README.md`](content/README.md)
 
 ---
