@@ -21,6 +21,23 @@ function isLowEndDevice() {
   return mem <= 3 || cores <= 4 || !!saveData || slow
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const check = () => {
+      const touch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0
+      const coarse = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false
+      const narrow = window.innerWidth < 1024
+      setIsMobile(touch || coarse || narrow)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return isMobile
+}
+
 export default function World() {
   const [coords, setCoords] = useState({ lat: '35.659', lon: '139.7005' })
   const [sizeDeg, setSizeDeg] = useState(0.01)
@@ -29,9 +46,22 @@ export default function World() {
   const [stats, setStats] = useState({ chunks: 0, buildings: 0, roads: 0, fps: 0, pending: 0 })
   const [hudNote, setHudNote] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [isFpv, setIsFpv] = useState(false)
+  const isFpvRef = useRef(false)
+  const isMobile = useIsMobile()
   const canvasRef = useRef(null)
   const engineRef = useRef(null)
   const lowEnd = useRef(typeof navigator === 'undefined' ? false : isLowEndDevice())
+
+  // joystick state (flexible touch joystick)
+  const joyMoveRef = useRef({ x: 0, y: 0 })
+  const joyBaseRef = useRef(null)
+  const [joyPos, setJoyPos] = useState({ x: 0, y: 0 })
+  const joyActiveRef = useRef(false)
+  const actionRef = useRef({ up: false, down: false, sprint: false })
+
+  // keep ref in sync
+  useEffect(() => { isFpvRef.current = isFpv }, [isFpv])
 
   const startAt = useCallback((lat, lon, size = sizeDeg) => {
     const nlat = Number(lat), nlon = Number(lon)
@@ -50,7 +80,7 @@ export default function World() {
   }, [sizeDeg])
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) { setErrorMsg('Geolocation not available'); return }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { setErrorMsg('Geolocation not available'); return }
     setHudNote('Locating you…')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -62,6 +92,46 @@ export default function World() {
       { enableHighAccuracy: false, timeout: 8000 }
     )
   }
+
+  // joystick handlers (flexible, appears on left side)
+  const handleJoyStart = useCallback((e) => {
+    if (!joyBaseRef.current) return
+    joyActiveRef.current = true
+    if (e.cancelable) e.preventDefault()
+    const rect = joyBaseRef.current.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const p = e.touches ? e.touches[0] : e
+    let dx = p.clientX - cx
+    let dy = p.clientY - cy
+    const max = rect.width / 2 - 16
+    const dist = Math.hypot(dx, dy)
+    if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max }
+    setJoyPos({ x: dx, y: dy })
+    joyMoveRef.current = { x: dx / max, y: -dy / max }
+  }, [])
+
+  const handleJoyMove = useCallback((e) => {
+    if (!joyActiveRef.current || !joyBaseRef.current) return
+    if (e.cancelable) e.preventDefault()
+    const rect = joyBaseRef.current.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const p = e.touches ? e.touches[0] : e
+    let dx = p.clientX - cx
+    let dy = p.clientY - cy
+    const max = rect.width / 2 - 16
+    const dist = Math.hypot(dx, dy)
+    if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max }
+    setJoyPos({ x: dx, y: dy })
+    joyMoveRef.current = { x: dx / max, y: -dy / max }
+  }, [])
+
+  const handleJoyEnd = useCallback(() => {
+    joyActiveRef.current = false
+    setJoyPos({ x: 0, y: 0 })
+    joyMoveRef.current = { x: 0, y: 0 }
+  }, [])
 
   // —— Three engine lifecycle ——
   useEffect(() => {
@@ -115,7 +185,7 @@ export default function World() {
       renderer.setClearColor(0x0b0f17, 1)
       renderer.outputColorSpace = THREE.SRGBColorSpace
       if (!lowEnd.current) {
-        renderer.shadowMap.enabled = false // keep off for perf even on mid
+        renderer.shadowMap.enabled = false
       }
 
       const width = canvas.clientWidth
@@ -168,15 +238,22 @@ export default function World() {
           const bbox = bboxFromCenter(lat, lon, active.size)
           const data = await fetchOSMChunk({ lat, lon, size: active.size })
           if (cancelled) return
-          // Generate on next idle to avoid frame hitch
           const chunkGroup = generateChunk({ bbox: data.bbox || bbox, elements: data.elements || [], origin, lowEnd: lowEnd.current })
           worldGroup.add(chunkGroup)
           chunkManager.add(lat, lon, bbox, chunkGroup)
-          // place camera near origin if first chunk
           if (chunkManager.size() === 1) {
             const c = chunkGroup.userData.centreMeters
-            controls.target.set(c.x, 0, c.z)
-            camera.position.set(c.x + 16, 18, c.z + 16)
+            // respect current FPV mode on first place
+            if (isFpvRef.current) {
+              camera.position.set(c.x, 2.2, c.z + 0.5)
+              controls.target.set(c.x, 1.6, c.z + 8)
+              controls.minDistance = 0.5
+              controls.maxDistance = 12
+              controls.maxPolarAngle = Math.PI / 1.9
+            } else {
+              controls.target.set(c.x, 0, c.z)
+              camera.position.set(c.x + 16, 18, c.z + 16)
+            }
             controls.update()
             setHudNote(data.source === 'sample-fallback' ? 'Offline demo — showing sample neighbourhood (Overpass unreachable)' : `Loaded ${data.elements.length} elements • ${chunkGroup.userData.buildingsCount} buildings • ${chunkGroup.userData.roadsCount} roads`)
             setTimeout(() => setHudNote(''), data.source === 'sample-fallback' ? 5000 : 2800)
@@ -197,20 +274,12 @@ export default function World() {
         }
       }
 
-      // initial chunk
       await loadChunk(active.lat, active.lon)
       if (cancelled) return
       setStatus('ready')
 
-      // neighbour prefetch helper
-      const prefetchNeighbours = () => {
-        const { DIRECTIONS, neighborBbox } = requireMaybe()
-        // we already imported DIRECTIONS via ChunkManager.getNeighbors; use that
-      }
-      // Use chunkManager.getNeighbors for logic
       function maybePrefetch() {
         if (!chunkManager || chunkManager.size() === 0) return
-        // find chunk player is currently inside or nearest
         let nearest = null, nearestDist = Infinity
         for (const rec of chunkManager.chunks.values()) {
           const c = rec.group.userData.centreMeters
@@ -218,8 +287,6 @@ export default function World() {
           if (d < nearestDist) { nearestDist = d; nearest = rec }
         }
         if (!nearest) return
-        const size = active.size
-        // edge threshold ~25% of chunk
         const halfW = nearest.group.userData.size.width / 2
         const halfH = nearest.group.userData.size.height / 2
         const localX = playerMeters.x - nearest.group.userData.centreMeters.x
@@ -227,22 +294,19 @@ export default function World() {
         const edgeDistX = halfW - Math.abs(localX)
         const edgeDistZ = halfH - Math.abs(localZ)
         const edgeDist = Math.min(edgeDistX, edgeDistZ)
-        const threshold = Math.min(halfW, halfH) * 0.32 // 32%
+        const threshold = Math.min(halfW, halfH) * 0.32
         if (edgeDist < threshold) {
-          // decide which neighbours to fetch based on side
           const neighbours = chunkManager.getNeighbors(nearest.bbox.center.lat, nearest.bbox.center.lon)
           for (const n of neighbours) {
-            // only fetch neighbours outward from player side to avoid fetching all 8 at once on first edge
             const isRelevant =
               (localX >  halfW * 0.4 && n.dir.includes('e')) ||
               (localX < -halfW * 0.4 && n.dir.includes('w')) ||
               (localZ >  halfH * 0.4 && n.dir.includes('n')) ||
               (localZ < -halfH * 0.4 && n.dir.includes('s')) ||
-              edgeDist < halfW * 0.18 // very near corner → fetch all
+              edgeDist < halfW * 0.18
             const should = edgeDist < halfW * 0.18 ? true : isRelevant
             if (!should) continue
             if (!chunkManager.has(n.bbox.center.lat, n.bbox.center.lon)) {
-              // low-priority background fetch
               if ('requestIdleCallback' in window) {
                 requestIdleCallback(() => loadChunk(n.bbox.center.lat, n.bbox.center.lon))
               } else {
@@ -251,7 +315,6 @@ export default function World() {
             }
           }
         }
-        // evict distant chunks
         const evicted = chunkManager.evictIfNeeded(playerMeters, (g) => {
           worldGroup.remove(g)
           disposeChunk(g)
@@ -261,14 +324,42 @@ export default function World() {
         }
       }
 
-      function requireMaybe() {
-        // placeholder to satisfy linter — not used
-        return { DIRECTIONS: [] }
-      }
-
-      // Movement vector (XZ plane) — WASD moves camera + target together
-      const moveSpeedBase = lowEnd.current ? 10 : 16 // metres per second ingame (1:10 → real 100-160 m/s feel)
+      const moveSpeedBase = lowEnd.current ? 10 : 16
       let lastPrefetch = 0
+
+      // FPV apply helper
+      const applyFpvMode = (fpv) => {
+        if (!camera || !controls) return
+        const target = controls.target
+        const pos = camera.position
+        if (fpv) {
+          // lower to eye height, bring target close for FPS feel
+          const forward = new THREE.Vector3(); camera.getWorldDirection(forward); forward.y = 0; if (forward.lengthSq() < 0.01) forward.set(0, 0, 1)
+          forward.normalize()
+          const newPosY = 2.2
+          // keep XZ, lower Y
+          camera.position.set(pos.x, newPosY, pos.z)
+          controls.target.set(pos.x + forward.x * 8, 1.6, pos.z + forward.z * 8)
+          controls.minDistance = 0.6
+          controls.maxDistance = 14
+          controls.maxPolarAngle = Math.PI / 1.85
+          controls.minPolarAngle = 0.12
+          camera.fov = 78
+        } else {
+          // orbit: elevate
+          const center = { x: controls.target.x, z: controls.target.z }
+          // if we have a chunk, elevate relative to it; else keep target XZ
+          camera.position.set(center.x + 16, 18, center.z + 16)
+          controls.target.set(center.x, 0, center.z)
+          controls.minDistance = 4
+          controls.maxDistance = 180
+          controls.maxPolarAngle = Math.PI / 2 - 0.06
+          controls.minPolarAngle = 0
+          camera.fov = 68
+        }
+        camera.updateProjectionMatrix()
+        controls.update()
+      }
 
       function animate(now) {
         raf = requestAnimationFrame(animate)
@@ -280,53 +371,64 @@ export default function World() {
           const fps = Math.round(fpsAccum / 30)
           fpsAccum = 0
           setStats((s) => ({ ...s, fps }))
-          // adaptive: if fps < 30 on lowEnd, reduce far chunks
           if (lowEnd.current && fps < 28 && chunkManager.size() > 3) {
             const ev = chunkManager.evictIfNeeded(playerMeters, (g) => { worldGroup.remove(g); disposeChunk(g) })
             if (ev.length) setHudNote('Optimizing for device — trimming distant chunks')
           }
         }
 
-        // WASD movement (move both camera and target)
         const forward = new THREE.Vector3()
         camera.getWorldDirection(forward)
         forward.y = 0; forward.normalize()
         const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).negate()
-        const sprint = keys.shift ? 1.8 : 1
+        const sprint = keys.shift || actionRef.current.sprint ? 1.8 : 1
         const speed = moveSpeedBase * sprint * dt
         const move = new THREE.Vector3()
+        // keyboard
         if (keys.w) move.addScaledVector(forward, speed)
         if (keys.s) move.addScaledVector(forward, -speed)
         if (keys.a) move.addScaledVector(right, -speed)
         if (keys.d) move.addScaledVector(right, speed)
-        if (keys.q) move.y -= speed * 0.8
-        if (keys.e) move.y += speed * 0.8
+        // joystick (flexible left stick) — mapped to WASD
+        const jx = joyMoveRef.current.x
+        const jy = joyMoveRef.current.y
+        if (Math.abs(jx) > 0.08 || Math.abs(jy) > 0.08) {
+          // jx → strafe, jy → forward
+          move.addScaledVector(right, jx * speed * 1.2)
+          move.addScaledVector(forward, jy * speed * 1.2)
+        }
+        if (keys.q || actionRef.current.down) move.y -= speed * 0.9
+        if (keys.e || actionRef.current.up) move.y += speed * 0.9
+        // FPV clamps vertical to ground-ish
+        if (isFpvRef.current) {
+          // keep near ground unless up/down held
+          if (!keys.q && !keys.e && !actionRef.current.up && !actionRef.current.down) {
+            // gently clamp y to eye height 2.2
+            const desiredY = 2.2
+            const diff = desiredY - camera.position.y
+            if (Math.abs(diff) > 0.02) move.y += diff * dt * 3
+          }
+        }
         if (move.lengthSq() > 0) {
           camera.position.add(move)
           controls.target.add(move)
         }
         controls.update()
-
-        // update playerMeters from camera XZ (player follows cam)
         playerMeters = { x: camera.position.x, z: camera.position.z }
-
-        // prefetch throttle 400ms
         if (now - lastPrefetch > 400) {
           maybePrefetch()
           lastPrefetch = now
         }
-
         renderer.render(scene, camera)
       }
       animate(performance.now())
       window.addEventListener('resize', onResize)
 
-      // expose for mobile on-screen controls
       engineRef.current = {
         move: (dir) => {
           const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize()
           const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).negate()
-          const s = moveSpeedBase * 0.06
+          const s = moveSpeedBase * 0.12
           const mv = new THREE.Vector3()
           if (dir === 'f') mv.addScaledVector(f, s)
           if (dir === 'b') mv.addScaledVector(f, -s)
@@ -334,17 +436,38 @@ export default function World() {
           if (dir === 'r') mv.addScaledVector(r, s)
           camera.position.add(mv); controls.target.add(mv); controls.update()
         },
+        setAction: (name, v) => { if (name in actionRef.current) actionRef.current[name] = v },
+        toggleFpv: () => {
+          const next = !isFpvRef.current
+          isFpvRef.current = next
+          setIsFpv(next)
+          applyFpvMode(next)
+          setHudNote(next ? 'FPV — eye level · drag to look · WASD/joystick · Q/E ↑↓' : 'Orbit — elevated · drag to orbit · scroll zoom')
+          setTimeout(() => setHudNote(''), 2200)
+        },
+        setFpv: (v) => {
+          isFpvRef.current = !!v
+          setIsFpv(!!v)
+          applyFpvMode(!!v)
+        },
         zoomIn: () => { camera.position.lerp(controls.target, 0.08); controls.update() },
         zoomOut: () => { const v = new THREE.Vector3().subVectors(camera.position, controls.target); v.multiplyScalar(1.08); camera.position.copy(controls.target).add(v); controls.update() },
         recenter: () => {
           if (chunkManager.size() === 0) return
           const first = [...chunkManager.chunks.values()][0]
           const c = first.group.userData.centreMeters
-          controls.target.set(c.x, 0, c.z)
-          camera.position.set(c.x + 16, 18, c.z + 16)
+          if (isFpvRef.current) {
+            camera.position.set(c.x, 2.2, c.z + 1)
+            controls.target.set(c.x, 1.6, c.z + 8)
+          } else {
+            controls.target.set(c.x, 0, c.z)
+            camera.position.set(c.x + 16, 18, c.z + 16)
+          }
           controls.update()
         },
       }
+      // sync initial FPV button state if already toggled before init (unlikely)
+      if (isFpvRef.current) applyFpvMode(true)
       setStats((s) => ({ ...s, pending: chunkManager.pending.size }))
     }
 
@@ -361,20 +484,18 @@ export default function World() {
       window.removeEventListener('resize', onResize)
       if (raf) cancelAnimationFrame(raf)
       if (engineRef.current) engineRef.current = null
-      // dispose three resources
-      // renderer will be GC’d; just try dispose
       try {
         if (renderer) {
           renderer.dispose()
-          // canvas will be reused on next mount — clear
-          const gl = renderer.getContext()
-          if (gl && gl.getExtension) {
-            // no forced lose_context
-          }
         }
       } catch (_) {}
     }
   }, [active])
+
+  // sync FPV toggle from React state to engine (when user clicks HUD button before engine ready)
+  useEffect(() => {
+    if (engineRef.current?.setFpv) engineRef.current.setFpv(isFpv)
+  }, [isFpv])
 
   return (
     <PageTransition className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
@@ -432,7 +553,16 @@ export default function World() {
               </select>
             </label>
             <button onClick={useMyLocation} className="rounded-full border border-[#1E2638] bg-[#0B0F17] px-3 py-1.5 text-xs font-mono text-brand-accent hover:border-brand-accent/40">◎ Use my location</button>
-            <span className="text-[11px] font-mono text-brand-muted">{lowEnd.current ? 'Low-end mode • capped DPR/shadows' : 'Full quality • DPR ≤1.5'}</span>
+            <button
+              onClick={() => {
+                if (engineRef.current?.toggleFpv) engineRef.current.toggleFpv()
+                else setIsFpv((v) => !v)
+              }}
+              className={`rounded-full border px-3 py-1.5 text-xs font-mono font-semibold ${isFpv ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-[#0B0F17] text-brand-muted border-[#1E2638] hover:border-brand-primary/30'}`}
+            >
+              {isFpv ? '● FPV' : '○ Orbit'} — FPV Camera
+            </button>
+            <span className="text-[11px] font-mono text-brand-muted">{lowEnd.current ? 'Low-end • capped DPR/shadows' : 'Full quality • DPR ≤1.5'} {isMobile ? '• touch' : '• desktop'}</span>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -481,6 +611,7 @@ export default function World() {
               <div className="mt-2 font-mono text-xs text-brand-text">{active.lat.toFixed(5)}, {active.lon.toFixed(5)} <span className="text-brand-muted">• size {active.size}</span></div>
               <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-mono">
                 <span className={`rounded-full px-2 py-1 border ${status === 'ready' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border-amber-500/30'}`}>{status}</span>
+                <span className={`rounded-full px-2 py-1 border ${isFpv ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-[#151A24] border-[#1E2638] text-brand-muted'}`}>{isFpv ? 'FPV' : 'Orbit'}</span>
                 <span className="rounded-full bg-[#151A24] border border-[#1E2638] px-2 py-1 text-brand-muted">1:10 • {(active.size * 111).toFixed(2)} km real</span>
                 <span className="rounded-full bg-[#151A24] border border-[#1E2638] px-2 py-1 text-brand-muted">{(active.size * 111 * 0.1).toFixed(2)} km ingame</span>
               </div>
@@ -489,10 +620,19 @@ export default function World() {
                 <div className="rounded-xl bg-[#151A24] border border-[#1E2638] p-2"><div className="font-display text-lg font-bold text-brand-text">{stats.buildings}</div><div className="text-[10px] font-mono text-brand-muted">BLDGS</div></div>
                 <div className="rounded-xl bg-[#151A24] border border-[#1E2638] p-2"><div className="font-display text-lg font-bold text-brand-text">{stats.roads}</div><div className="text-[10px] font-mono text-brand-muted">ROADS</div></div>
               </div>
-              <div className="mt-2 font-mono text-[11px] text-brand-muted">{stats.fps ? `${stats.fps} fps` : '— fps'} • pending {stats.pending}</div>
+              <div className="mt-2 font-mono text-[11px] text-brand-muted">{stats.fps ? `${stats.fps} fps` : '— fps'} • pending {stats.pending} {isMobile ? '• touch' : ''}</div>
               <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => {
+                    if (engineRef.current?.toggleFpv) engineRef.current.toggleFpv()
+                    else setIsFpv((v) => !v)
+                  }}
+                  className={`flex-1 rounded-xl border px-3 py-2 text-xs font-semibold ${isFpv ? 'bg-emerald-500 text-[#0B0F17] border-emerald-500' : 'bg-[#151A24] border-[#1E2638] text-brand-text hover:border-brand-primary/30'}`}
+                >
+                  {isFpv ? 'Orbit view' : 'FPV view'}
+                </button>
                 <button onClick={() => engineRef.current?.recenter()} className="flex-1 rounded-xl border border-[#1E2638] bg-[#151A24] px-3 py-2 text-xs font-medium text-brand-text hover:border-brand-primary/30">Recenter</button>
-                <button onClick={() => setActive(null) || setStatus('idle')} className="flex-1 rounded-xl bg-[#1E2638] px-3 py-2 text-xs font-medium text-brand-muted hover:text-brand-text">Close world</button>
+                <button onClick={() => setActive(null) || setStatus('idle')} className="flex-1 rounded-xl bg-[#1E2638] px-3 py-2 text-xs font-medium text-brand-muted hover:text-brand-text">Close</button>
               </div>
             </div>
           )}
@@ -513,12 +653,25 @@ export default function World() {
           {/* HUD */}
           <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 flex flex-wrap items-center justify-between gap-2">
             <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#151A24]/90 backdrop-blur px-2.5 py-1 text-[11px] font-mono text-brand-muted border border-[#1E2638]">WASD move • Shift sprint • Q/E up/down • drag to orbit • scroll zoom</span>
+              <span className="hidden sm:inline-flex rounded-full bg-[#151A24]/90 backdrop-blur px-2.5 py-1 text-[11px] font-mono text-brand-muted border border-[#1E2638]">
+                {isFpv ? 'FPV · drag look · joystick move · Q/E ↑↓ · Shift sprint' : 'Orbit · drag orbit · scroll zoom · WASD/joystick · Q/E ↑↓'}
+              </span>
+              <span className="sm:hidden rounded-full bg-[#151A24]/90 backdrop-blur px-2 py-1 text-[10px] font-mono text-brand-muted border border-[#1E2638]">{isFpv ? 'FPV' : 'Orbit'} · use joystick</span>
               {hudNote && <span className="rounded-full bg-brand-primary px-2.5 py-1 text-[11px] font-mono font-semibold text-white shadow">{hudNote}</span>}
             </div>
-            <div className="pointer-events-auto hidden items-center gap-1 sm:flex">
-              <span className="rounded-full bg-[#151A24]/90 backdrop-blur px-2.5 py-1 text-[11px] font-mono text-brand-text border border-[#1E2638]">{stats.fps ? `${stats.fps} fps` : '-- fps'} • {stats.chunks} chunks</span>
-              <button onClick={() => setActive(null)} className="rounded-full bg-[#151A24]/90 backdrop-blur px-3 py-1 text-[11px] font-mono text-brand-muted border border-[#1E2638] hover:text-brand-text">✕ Close</button>
+            <div className="pointer-events-auto flex items-center gap-1">
+              <button
+                onClick={() => {
+                  if (engineRef.current?.toggleFpv) engineRef.current.toggleFpv()
+                  else setIsFpv((v) => !v)
+                }}
+                className={`rounded-full backdrop-blur px-3 py-1 text-[11px] font-mono font-semibold border ${isFpv ? 'bg-emerald-500 text-[#0B0F17] border-emerald-500' : 'bg-[#151A24]/90 text-brand-text border-[#1E2638] hover:border-brand-primary/30'}`}
+              >
+                {isFpv ? '● FPV' : '○ Orbit'}
+              </button>
+              <span className="hidden sm:inline-flex rounded-full bg-[#151A24]/90 backdrop-blur px-2.5 py-1 text-[11px] font-mono text-brand-text border border-[#1E2638]">{stats.fps ? `${stats.fps} fps` : '-- fps'} • {stats.chunks} chunks</span>
+              <button onClick={() => setActive(null)} className="hidden sm:inline-flex rounded-full bg-[#151A24]/90 backdrop-blur px-3 py-1 text-[11px] font-mono text-brand-muted border border-[#1E2638] hover:text-brand-text">✕ Close</button>
+              <button onClick={() => setActive(null)} className="sm:hidden rounded-full bg-[#151A24]/90 backdrop-blur px-2.5 py-1 text-[11px] font-mono text-brand-muted border border-[#1E2638]">✕</button>
             </div>
           </div>
 
@@ -535,27 +688,157 @@ export default function World() {
               </div>
             )}
             <canvas ref={canvasRef} className="h-full w-full block" style={{ width: '100%', height: '100%' }} />
-            {/* Mobile on-screen controls */}
-            <div className="absolute bottom-3 left-3 right-3 z-10 flex items-end justify-between gap-3 sm:bottom-4 sm:left-4 sm:right-4">
-              <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-[#1E2638] bg-[#0B0F17]/80 p-2 backdrop-blur">
-                <div />
-                <button onTouchStart={(e) => { e.preventDefault(); engineRef.current?.move('f') }} onMouseDown={() => engineRef.current?.move('f')} className="h-9 w-9 rounded-xl bg-[#151A24] border border-[#1E2638] text-brand-text active:bg-brand-primary active:text-white">▲</button>
-                <div />
-                <button onTouchStart={(e) => { e.preventDefault(); engineRef.current?.move('l') }} onMouseDown={() => engineRef.current?.move('l')} className="h-9 w-9 rounded-xl bg-[#151A24] border border-[#1E2638] text-brand-text active:bg-brand-primary active:text-white">◀</button>
-                <button onTouchStart={(e) => { e.preventDefault(); engineRef.current?.move('b') }} onMouseDown={() => engineRef.current?.move('b')} className="h-9 w-9 rounded-xl bg-[#151A24] border border-[#1E2638] text-brand-text active:bg-brand-primary active:text-white">▼</button>
-                <button onTouchStart={(e) => { e.preventDefault(); engineRef.current?.move('r') }} onMouseDown={() => engineRef.current?.move('r')} className="h-9 w-9 rounded-xl bg-[#151A24] border border-[#1E2638] text-brand-text active:bg-brand-primary active:text-white">▶</button>
+
+            {/* ── Mobile touch controls (only on touch/coarse devices) ── */}
+            {isMobile && (
+              <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 p-3 sm:p-4 pointer-events-none">
+                {/* Left: flexible joystick */}
+                <div className="pointer-events-auto flex flex-col items-center gap-1.5">
+                  <div
+                    ref={joyBaseRef}
+                    onTouchStart={handleJoyStart}
+                    onTouchMove={handleJoyMove}
+                    onTouchEnd={handleJoyEnd}
+                    onTouchCancel={handleJoyEnd}
+                    onMouseDown={handleJoyStart}
+                    onMouseMove={handleJoyMove}
+                    onMouseUp={handleJoyEnd}
+                    onMouseLeave={handleJoyEnd}
+                    className="relative flex h-[128px] w-[128px] items-center justify-center rounded-full border border-white/20 bg-white/[0.08] backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', opacity: 0.92 }}
+                  >
+                    {/* base ring */}
+                    <div className="absolute inset-2 rounded-full border border-white/10 bg-white/[0.04]" />
+                    {/* stick */}
+                    <div
+                      className="absolute h-14 w-14 rounded-full border border-white/20 bg-white/80 shadow-lg flex items-center justify-center"
+                      style={{
+                        transform: `translate(${joyPos.x}px, ${joyPos.y}px)`,
+                        backgroundColor: 'rgba(255,255,255,0.92)',
+                        opacity: 0.9,
+                        transition: joyActiveRef.current ? 'none' : 'transform 140ms ease-out',
+                      }}
+                    >
+                      <span className="text-[10px] font-mono font-bold text-[#0B0F17]">◉</span>
+                    </div>
+                    {/* cross hint */}
+                    <div className="pointer-events-none absolute h-[1px] w-8 bg-white/20" />
+                    <div className="pointer-events-none absolute h-8 w-[1px] bg-white/20" />
+                  </div>
+                  <span className="rounded-full bg-[#0B0F17]/20 backdrop-blur px-2 py-0.5 text-[10px] font-mono font-semibold tracking-wider text-white/80 border border-white/10">MOVE</span>
+                </div>
+
+                {/* Right: translucent action buttons (20% opacity) */}
+                <div className="pointer-events-auto flex flex-col items-end gap-2">
+                  {/* top row: FPV + recenter */}
+                  <div className="flex gap-2">
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); if (engineRef.current?.toggleFpv) engineRef.current.toggleFpv() }}
+                      onClick={() => engineRef.current?.toggleFpv?.()}
+                      className="h-10 rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur px-3 text-xs font-mono font-bold text-white shadow active:bg-white/30"
+                      style={{ opacity: 0.88 }}
+                    >
+                      {isFpv ? 'Orbit' : 'FPV'}
+                    </button>
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); engineRef.current?.recenter() }}
+                      onClick={() => engineRef.current?.recenter()}
+                      className="h-10 w-10 rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30 flex items-center justify-center"
+                      style={{ opacity: 0.88 }}
+                      aria-label="Recenter"
+                    >
+                      ⌖
+                    </button>
+                  </div>
+                  {/* D-pad style but mapped translucent, plus up/down/sprint */}
+                  <div className="flex items-end gap-2">
+                    {/* vertical up/down + sprint cluster */}
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onTouchStart={(e) => { e.preventDefault(); actionRef.current.up = true; engineRef.current?.setAction?.('up', true) }}
+                        onTouchEnd={(e) => { e.preventDefault(); actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
+                        onTouchCancel={() => { actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
+                        onMouseDown={() => { actionRef.current.up = true; engineRef.current?.setAction?.('up', true) }}
+                        onMouseUp={() => { actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
+                        onMouseLeave={() => { actionRef.current.up = false; engineRef.current?.setAction?.('up', false) }}
+                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-white font-bold shadow active:bg-emerald-500/40 active:border-emerald-400/40"
+                        style={{ opacity: 0.88 }}
+                        aria-label="Up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onTouchStart={(e) => { e.preventDefault(); actionRef.current.down = true; engineRef.current?.setAction?.('down', true) }}
+                        onTouchEnd={(e) => { e.preventDefault(); actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
+                        onTouchCancel={() => { actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
+                        onMouseDown={() => { actionRef.current.down = true; engineRef.current?.setAction?.('down', true) }}
+                        onMouseUp={() => { actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
+                        onMouseLeave={() => { actionRef.current.down = false; engineRef.current?.setAction?.('down', false) }}
+                        className="h-[44px] w-[44px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-white font-bold shadow active:bg-emerald-500/40"
+                        style={{ opacity: 0.88 }}
+                        aria-label="Down"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onTouchStart={(e) => { e.preventDefault(); actionRef.current.sprint = true; engineRef.current?.setAction?.('sprint', true) }}
+                        onTouchEnd={(e) => { e.preventDefault(); actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
+                        onTouchCancel={() => { actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
+                        onMouseDown={() => { actionRef.current.sprint = true; engineRef.current?.setAction?.('sprint', true) }}
+                        onMouseUp={() => { actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
+                        onMouseLeave={() => { actionRef.current.sprint = false; engineRef.current?.setAction?.('sprint', false) }}
+                        className="h-[44px] w-[88px] rounded-xl border border-white/20 bg-white/[0.14] backdrop-blur text-xs font-mono font-bold text-white shadow active:bg-amber-500/40"
+                        style={{ opacity: 0.88 }}
+                      >
+                        ⚡ SPRINT
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onTouchStart={(e) => { e.preventDefault(); engineRef.current?.zoomIn?.() }}
+                          onClick={() => engineRef.current?.zoomIn?.()}
+                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30"
+                          style={{ opacity: 0.88 }}
+                        >
+                          ＋
+                        </button>
+                        <button
+                          onTouchStart={(e) => { e.preventDefault(); engineRef.current?.zoomOut?.() }}
+                          onClick={() => engineRef.current?.zoomOut?.()}
+                          className="h-9 w-[42px] rounded-xl border border-white/20 bg-white/[0.12] backdrop-blur text-white shadow active:bg-white/30"
+                          style={{ opacity: 0.88 }}
+                        >
+                          －
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-[#0B0F17]/20 backdrop-blur px-2 py-0.5 text-[10px] font-mono font-semibold tracking-wider text-white/70 border border-white/10">ACTIONS</span>
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                <button onClick={() => engineRef.current?.zoomIn()} className="h-9 w-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur text-brand-text">＋</button>
-                <button onClick={() => engineRef.current?.zoomOut()} className="h-9 w-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur text-brand-text">－</button>
-                <button onClick={() => engineRef.current?.recenter()} className="hidden sm:inline-flex h-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur px-3 text-xs font-mono text-brand-muted sm:items-center">Recenter</button>
+            )}
+
+            {/* Desktop fallback controls (shown only when NOT mobile) */}
+            {!isMobile && (
+              <div className="absolute bottom-3 left-3 right-3 z-10 hidden sm:flex items-end justify-between gap-3 pointer-events-none">
+                <div className="pointer-events-auto flex gap-1.5 rounded-2xl border border-[#1E2638] bg-[#0B0F17]/70 p-2 backdrop-blur text-[11px] font-mono text-brand-muted">
+                  <span className="px-2 py-1">WASD move</span>
+                  <span className="px-2 py-1 border-l border-[#1E2638]">Shift sprint</span>
+                  <span className="px-2 py-1 border-l border-[#1E2638]">Q/E ↑↓</span>
+                </div>
+                <div className="pointer-events-auto flex gap-1.5">
+                  <button onClick={() => engineRef.current?.zoomIn()} className="h-9 w-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur text-brand-text">＋</button>
+                  <button onClick={() => engineRef.current?.zoomOut()} className="h-9 w-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur text-brand-text">－</button>
+                  <button onClick={() => engineRef.current?.recenter()} className="hidden sm:inline-flex h-9 rounded-xl border border-[#1E2638] bg-[#0B0F17]/80 backdrop-blur px-3 text-xs font-mono text-brand-muted sm:items-center">Recenter</button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1E2638] bg-[#151A24] px-3 py-2 text-[11px] font-mono text-brand-muted">
-            <span>Scale 1:10 • XY faithful • Z stylized (levels → height) • chunk {active.size}° ≈ {(active.size * 111).toFixed(2)} km real → {(active.size * 111 * 0.1).toFixed(2)} km ingame</span>
-            <span className="hidden sm:inline">Tip: approach any edge — next chunk streams lazily in the background without hitch.</span>
+            <span>Scale 1:10 • XY faithful • Z stylized (levels → height) • chunk {active.size}° ≈ {(active.size * 111).toFixed(2)} km real → {(active.size * 111 * 0.1).toFixed(2)} km ingame {isFpv ? '• FPV eye 2.2m' : ''}</span>
+            <span className="hidden sm:inline">Tip: approach any edge — next chunk streams lazily in the background without hitch. {isMobile ? 'Joystick left, actions right (20% translucent).' : ''}</span>
           </div>
         </div>
       )}
